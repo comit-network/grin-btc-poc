@@ -1,9 +1,17 @@
 [package]
 name = "grin_btc_poc"
 version = "0.1.0"
-authors = ["Lucas Soriano del Pino <l.soriano.del.pino@gmail.com>"]
+authors = ["CoBloX developers <team@coblox.tech>", "Lloyd Fournier <lloyd.fourn@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+blake2 = "0.8"
+grin_secp256k1zkp = "0.7"
+generic-array = "0.12"
+lazy_static = "1.4"
+bitcoin = { version = "0.19", git = "https://github.com/jaspervdm/rust-bitcoin", branch = "zkp", features = ["bitcoinconsensus"] }
+rand = "0.7"
+serde = "1"
+
+[patch.crates-io]
+grin_secp256k1zkp = { git = "https://github.com/jaspervdm/rust-secp256k1-zkp", branch = "master" }
