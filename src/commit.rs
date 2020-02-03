@@ -6,10 +6,15 @@ pub struct Commitment([u8; 64]);
 pub struct Opening {
     PKs_grin: grin::PKs,
     PKs_bitcoin: bitcoin::PKs,
+    Y: grin::PublicKey,
 }
 
 impl Commitment {
-    pub fn commit(PKs_grin: &grin::PKs, PKs_bitcoin: &bitcoin::PKs) -> Commitment {
+    pub fn commit(
+        PKs_grin: &grin::PKs,
+        PKs_bitcoin: &bitcoin::PKs,
+        Y: &grin::PublicKey,
+    ) -> Commitment {
         let mut hasher = Blake2b::new();
 
         hasher.input(PKs_grin.X.0);
@@ -17,6 +22,7 @@ impl Commitment {
         hasher.input(PKs_grin.R_redeem.0);
         hasher.input(PKs_grin.R_refund.0);
         hasher.input(PKs_bitcoin.X.0);
+        hasher.input(Y.0);
 
         let mut commitment = [0u8; 64];
         commitment.copy_from_slice(&hasher.result());
@@ -26,15 +32,16 @@ impl Commitment {
 }
 
 impl Opening {
-    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs) -> Self {
+    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs, Y: grin::PublicKey) -> Self {
         Opening {
             PKs_grin,
             PKs_bitcoin,
+            Y,
         }
     }
 
     pub fn open(self, commitment: Commitment) -> Result<(grin::PKs, bitcoin::PKs), ()> {
-        let self_commitment = Commitment::commit(&self.PKs_grin, &self.PKs_bitcoin);
+        let self_commitment = Commitment::commit(&self.PKs_grin, &self.PKs_bitcoin, &self.Y);
 
         if &commitment.0[..] == &self_commitment.0[..] {
             Ok((self.PKs_grin, self.PKs_bitcoin))
