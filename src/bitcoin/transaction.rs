@@ -1,7 +1,7 @@
 use crate::setup_parameters;
 use ::bitcoin::{
-    blockdata::script, hashes::sha256d::Hash, network::constants::Network, Address, Script,
-    Transaction, TxIn, TxOut,
+    blockdata::script, hashes::sha256d::Hash, network::constants::Network, Address, OutPoint,
+    Script, Transaction, TxIn, TxOut,
 };
 use secp256k1zkp::key::PublicKey;
 
@@ -57,16 +57,15 @@ pub fn refund_transaction(
     fund_transaction_id: Hash,
 ) -> Transaction {
     Transaction {
-        input: init
-            .inputs
-            .iter()
-            .map(|i| TxIn {
-                previous_output: i.0.clone(),
-                sequence: 0xffffffff,
-                witness: Vec::new(),
-                script_sig: Script::new(),
-            })
-            .collect(),
+        input: vec![TxIn {
+            previous_output: OutPoint {
+                txid: fund_transaction_id,
+                vout: 0,
+            },
+            sequence: 0xffffffff,
+            witness: Vec::new(),
+            script_sig: Script::new(),
+        }],
         output: vec![TxOut {
             script_pubkey: init.refund_address.script_pubkey(),
             value: init.asset,

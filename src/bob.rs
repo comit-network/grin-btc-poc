@@ -48,7 +48,7 @@ impl Bob0 {
         let refund_transaction =
             bitcoin::transaction::refund_transaction(&self.init.beta, fund_transaction.txid());
 
-        let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
+        let refund_digest = bitcoin::SighashComponents::new(&refund_transaction).sighash_all(
             &refund_transaction.input[0],
             &fund_output_script,
             fund_transaction.output[0].value,
@@ -56,19 +56,29 @@ impl Bob0 {
         let refund_digest = Message::from_slice(&refund_digest.into_inner())
             .expect("Should not fail because it is a hash");
 
+        let alice_beta_refund_signature = message2.alice_beta_refund_signature;
         if !bitcoin::keypair::verify_ecdsa(
             &refund_digest,
-            &message2.alice_beta_refund_signature,
+            &alice_beta_refund_signature,
             &alice_PKs_bitcoin.X,
         ) {
             return Err(());
         }
+
+        let bob_beta_refund_signature = self.SKs_beta.x.sign_ecdsa(&refund_digest);
+
+        let refund_action = bitcoin::action::Refund::new(
+            refund_transaction,
+            alice_beta_refund_signature,
+            bob_beta_refund_signature,
+        );
 
         Ok(Bob1 {
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
             alice_PKs_grin,
             alice_PKs_bitcoin,
+            refund_action,
         })
     }
 }
@@ -78,4 +88,5 @@ pub struct Bob1 {
     SKs_beta: bitcoin::SKs,
     alice_PKs_grin: grin::PKs,
     alice_PKs_bitcoin: bitcoin::PKs,
+    refund_action: bitcoin::action::Refund,
 }

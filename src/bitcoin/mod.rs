@@ -1,5 +1,6 @@
 use rand::Rng;
 
+pub mod action;
 pub mod keypair;
 pub mod transaction;
 
