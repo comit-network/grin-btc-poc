@@ -9,7 +9,7 @@ lazy_static::lazy_static! {
     pub static ref SECP: Secp256k1 = Secp256k1::new();
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct KeyPair {
     pub secret_key: SecretKey,
     pub public_key: PublicKey,

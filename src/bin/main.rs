@@ -1,4 +1,7 @@
-use grin_btc_poc::{Alice0, Alice1, Bob0, Bob1};
+use grin_btc_poc::{
+    alice::{Alice0, Alice1},
+    bob::{Bob0, Bob1},
+};
 
 fn main() {
     let (alice0, message0) = Alice0::new();
