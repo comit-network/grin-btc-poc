@@ -1,14 +1,40 @@
 use grin_btc_poc::{
     alice::{Alice0, Alice1},
     bob::{Bob0, Bob1},
+    setup_parameters::{Bitcoin, Grin, SetupParameters},
 };
+use std::str::FromStr;
 
 fn main() {
-    let (alice0, message0) = Alice0::new();
+    // TODO: Use proper setup parameters
+    let init = SetupParameters {
+        alpha: Grin {
+            amount: 10_000_000_000,
+            fee: 8_000_000,
+            expiry: 0,
+        },
+        beta: Bitcoin::new(
+            100_000_000,
+            1_000,
+            0,
+            vec![(bitcoin::OutPoint::null(), 300_000_000)],
+            bitcoin::Address::from_str(
+                "bcrt1qs2aderg3whgu0m8uadn6dwxjf7j3wx97kk2qqtrum89pmfcxknhsf89pj0",
+            )
+            .unwrap(),
+            bitcoin::Address::from_str(
+                "bcrt1qc45uezve8vj8nds7ws0da8vfkpanqfxecem3xl7wcs3cdne0358q9zx9qg",
+            )
+            .unwrap(),
+        )
+        .expect("cannot fail"),
+    };
 
-    let (bob0, message1) = Bob0::new(message0);
+    let (alice0, message0) = Alice0::new(init.clone());
 
-    let (alice1, message2) = alice0.receive(message1);
+    let (bob0, message1) = Bob0::new(init, message0);
+
+    let (alice1, message2) = alice0.receive(message1).expect("message1");
 
     let bob1 = bob0.receive(message2);
 }

@@ -2,6 +2,7 @@ use bitcoin::{
     network::constants::Network,
     secp256k1::{key, Secp256k1, SecretKey},
 };
+use secp256k1zkp::{Message, Signature};
 
 pub use bitcoin::secp256k1::PublicKey;
 
@@ -31,4 +32,12 @@ impl KeyPair {
 
         KeyPair::new(secret_key)
     }
+
+    pub fn sign_ecdsa(&self, message: &Message) -> Signature {
+        SECP.sign(message, &self.secret_key).expect("cannot fail")
+    }
+}
+
+pub fn verify_ecdsa(msg: &Message, sig: &Signature, pk: &PublicKey) -> bool {
+    SECP.verify(msg, sig, pk).is_ok()
 }

@@ -13,4 +13,5 @@ pub struct Message1 {
 
 pub struct Message2 {
     pub opening: Opening,
+    pub alice_beta_refund_signature: bitcoin::Signature,
 }
