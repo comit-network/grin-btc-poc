@@ -12,6 +12,7 @@ lazy_static = "1.4"
 bitcoin = { version = "0.19", git = "https://github.com/jaspervdm/rust-bitcoin", branch = "zkp", features = ["bitcoinconsensus"] }
 rand = "0.7"
 serde = "1"
+rust-gmp = "0.5"
 
 [patch.crates-io]
 grin_secp256k1zkp = { git = "https://github.com/jaspervdm/rust-secp256k1-zkp", branch = "master" }

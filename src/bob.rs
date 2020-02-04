@@ -1,7 +1,7 @@
 use crate::{
     bitcoin::{self, Hash},
     commit::Commitment,
-    grin,
+    grin, keypair,
     messages::{Message0, Message1, Message2},
     setup_parameters::SetupParameters,
 };
@@ -57,7 +57,7 @@ impl Bob0 {
             .expect("Should not fail because it is a hash");
 
         let alice_beta_refund_signature = message2.alice_beta_refund_signature;
-        if !bitcoin::keypair::verify_ecdsa(
+        if !keypair::verify_ecdsa(
             &refund_digest,
             &alice_beta_refund_signature,
             &alice_PKs_bitcoin.X,
@@ -72,6 +72,9 @@ impl Bob0 {
             alice_beta_refund_signature,
             bob_beta_refund_signature,
         );
+
+        let redeem_transaction =
+            bitcoin::transaction::redeem_transaction(&self.init.beta, fund_transaction.txid());
 
         Ok(Bob1 {
             SKs_alpha: self.SKs_alpha,

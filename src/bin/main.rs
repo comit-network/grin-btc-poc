@@ -19,6 +19,10 @@ fn main() {
             0,
             vec![(bitcoin::OutPoint::null(), 300_000_000)],
             bitcoin::Address::from_str(
+                "bcrt1qc45uezve8vj8nds7ws0da8vfkpanqfxecem3xl7wcs3cdne0358q9zx9qg",
+            )
+            .unwrap(),
+            bitcoin::Address::from_str(
                 "bcrt1qs2aderg3whgu0m8uadn6dwxjf7j3wx97kk2qqtrum89pmfcxknhsf89pj0",
             )
             .unwrap(),

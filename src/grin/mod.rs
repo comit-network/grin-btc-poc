@@ -1,8 +1,5 @@
+use crate::keypair::{KeyPair, PublicKey};
 use rand::Rng;
-
-pub mod keypair;
-
-pub use keypair::{KeyPair, PublicKey, SecretKey};
 
 #[derive(Debug, Clone)]
 pub struct SKs {

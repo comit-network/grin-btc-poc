@@ -1,4 +1,4 @@
-use crate::{bitcoin, grin};
+use crate::{bitcoin, grin, keypair};
 use blake2::{Blake2b, Digest};
 
 pub struct Commitment([u8; 64]);
@@ -6,14 +6,14 @@ pub struct Commitment([u8; 64]);
 pub struct Opening {
     PKs_grin: grin::PKs,
     PKs_bitcoin: bitcoin::PKs,
-    Y: grin::PublicKey,
+    Y: keypair::PublicKey,
 }
 
 impl Commitment {
     pub fn commit(
         PKs_grin: &grin::PKs,
         PKs_bitcoin: &bitcoin::PKs,
-        Y: &grin::PublicKey,
+        Y: &keypair::PublicKey,
     ) -> Commitment {
         let mut hasher = Blake2b::new();
 
@@ -32,7 +32,7 @@ impl Commitment {
 }
 
 impl Opening {
-    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs, Y: grin::PublicKey) -> Self {
+    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs, Y: keypair::PublicKey) -> Self {
         Opening {
             PKs_grin,
             PKs_bitcoin,

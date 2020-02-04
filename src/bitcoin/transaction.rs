@@ -74,3 +74,26 @@ pub fn refund_transaction(
         version: 2,
     }
 }
+
+pub fn redeem_transaction(
+    init: &setup_parameters::Bitcoin,
+    fund_transaction_id: Hash,
+) -> Transaction {
+    Transaction {
+        input: vec![TxIn {
+            previous_output: OutPoint {
+                txid: fund_transaction_id,
+                vout: 0,
+            },
+            sequence: 0xffffffff,
+            witness: Vec::new(),
+            script_sig: Script::new(),
+        }],
+        output: vec![TxOut {
+            script_pubkey: init.redeem_address.script_pubkey(),
+            value: init.redeem_output_amount(),
+        }],
+        lock_time: 0,
+        version: 2,
+    }
+}

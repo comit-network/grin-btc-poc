@@ -1,7 +1,7 @@
 use crate::{
     bitcoin::{self, Hash, SighashComponents},
     commit::{Commitment, Opening},
-    grin,
+    grin, keypair,
     messages::{Message0, Message1, Message2},
     setup_parameters::SetupParameters,
 };
@@ -13,14 +13,14 @@ pub struct Alice0 {
     init: SetupParameters,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
-    y: grin::KeyPair,
+    y: keypair::KeyPair,
 }
 
 impl Alice0 {
     pub fn new(init: SetupParameters) -> (Self, Message0) {
         let SKs_alpha = grin::SKs::keygen();
         let SKs_beta = bitcoin::SKs::keygen();
-        let y = grin::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
+        let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
 
         let commitment = Commitment::commit(&SKs_alpha.public(), &SKs_beta.public(), &y.public_key);
         let message = Message0(commitment);

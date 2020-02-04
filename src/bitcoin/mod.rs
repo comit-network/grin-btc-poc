@@ -1,11 +1,10 @@
+use crate::keypair::{KeyPair, PublicKey};
 use rand::Rng;
 
 pub mod action;
-pub mod keypair;
 pub mod transaction;
 
 pub use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents, Address, OutPoint};
-pub use keypair::{KeyPair, PublicKey};
 pub use secp256k1zkp::Signature;
 
 #[derive(Debug, Clone)]
