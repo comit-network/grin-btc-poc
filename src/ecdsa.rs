@@ -1,5 +1,8 @@
-use crate::keypair::{
-    ConvertBigInt, KeyPair, PublicKey, SecretKey, XCoor, CURVE_ORDER, G, HALF_CURVE_ORDER, SECP,
+use crate::{
+    dleq,
+    keypair::{
+        ConvertBigInt, KeyPair, PublicKey, SecretKey, XCoor, CURVE_ORDER, G, HALF_CURVE_ORDER, SECP,
+    },
 };
 use gmp::mpz::Mpz;
 use std::borrow::Borrow;
@@ -15,6 +18,8 @@ fn sign(x: &KeyPair, message_hash: &[u8]) -> Signature {
     // Get x-coordinate modulo q
     let Rx = r.public_key.x_coor().mod_floor(&*CURVE_ORDER);
 
+    // TODO: only use Mpz arithmetic for inverting, rest should go back to
+    // secp256k1::SecretKey arithmetic
     let r_inv = r.secret_key.to_bigint().invert(&*CURVE_ORDER).unwrap();
 
     let message_hash = Mpz::from(message_hash);
@@ -35,6 +40,54 @@ fn sign(x: &KeyPair, message_hash: &[u8]) -> Signature {
     Signature { s, Rx }
 }
 
+pub struct EncryptedSignature {
+    R: PublicKey,
+    R_hat: PublicKey,
+    s_hat: SecretKey,
+    proof: dleq::Proof,
+}
+
+pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSignature {
+    // TODO: generate secret key randomly and make dleq::prove abstract (taking both
+    // generators)
+    let r = KeyPair::new_random();
+    let mut R_hat = G.clone();
+    R_hat.mul_assign(&*SECP, &r.secret_key).unwrap();
+
+    let mut R = Y.clone();
+    R.mul_assign(&*SECP, &r.secret_key).unwrap();
+
+    let proof = dleq::prove(&R_hat, &Y, &R, &r.secret_key);
+
+    // TODO: implement x_coor_mod_q() -> SecretKey on XCoor
+    let Rx = r.public_key.x_coor().mod_floor(&*CURVE_ORDER);
+    let Rx = SecretKey::from_bigint(&Rx).unwrap();
+
+    let mut s_hat = Rx.clone();
+    s_hat.mul_assign(&*SECP, &x.secret_key).unwrap();
+    s_hat
+        .add_assign(
+            &*SECP,
+            &SecretKey::from_slice(&*SECP, &message_hash).expect("TODO: mod q the message hash"),
+        )
+        .unwrap();
+
+    // TODO: implement invert on secp256k1::SecretKey
+    let r_inv = r.secret_key.to_bigint().invert(&*CURVE_ORDER).unwrap();
+    let r_inv = SecretKey::from_bigint(&r_inv).unwrap();
+
+    s_hat.mul_assign(&*SECP, &r_inv).unwrap();
+
+    EncryptedSignature {
+        R,
+        R_hat,
+        s_hat,
+        proof,
+    }
+}
+
+/// ECDSA verification
+/// Does not check low s
 fn verify(X: &PublicKey, message_hash: &[u8], signature: &Signature) -> bool {
     let message_hash = Mpz::from(message_hash);
 

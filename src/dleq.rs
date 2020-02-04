@@ -10,7 +10,7 @@ pub struct Proof {
     c: SecretKey,
 }
 
-fn prove(R_hat: PublicKey, Y: PublicKey, R: PublicKey, witness: SecretKey) -> Proof {
+pub fn prove(R_hat: &PublicKey, Y: &PublicKey, R: &PublicKey, witness: &SecretKey) -> Proof {
     let secret_nonce = KeyPair::new_random();
 
     let public_nonce_1 = secret_nonce.public_key;
