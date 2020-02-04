@@ -39,7 +39,7 @@ impl KeyPair {
     }
 
     pub fn new_random() -> Self {
-        KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>())
+        KeyPair::new(random_secret_key())
     }
 
     pub fn sign_ecdsa(&self, message: &Message) -> Signature {
@@ -79,4 +79,8 @@ impl ConvertBigInt for SecretKey {
         let vec: Vec<u8> = from.borrow().into();
         SecretKey::from_slice(&*SECP, &vec).ok()
     }
+}
+
+pub fn random_secret_key() -> SecretKey {
+    SecretKey::from_slice(&*SECP, &rand::thread_rng().gen::<[u8; 32]>()).unwrap()
 }

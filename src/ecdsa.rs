@@ -1,7 +1,8 @@
 use crate::{
     dleq,
     keypair::{
-        ConvertBigInt, KeyPair, PublicKey, SecretKey, XCoor, CURVE_ORDER, G, HALF_CURVE_ORDER, SECP,
+        random_secret_key, ConvertBigInt, KeyPair, PublicKey, SecretKey, XCoor, CURVE_ORDER, G,
+        HALF_CURVE_ORDER, SECP,
     },
 };
 use gmp::mpz::Mpz;
@@ -50,17 +51,17 @@ pub struct EncryptedSignature {
 pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSignature {
     // TODO: generate secret key randomly and make dleq::prove abstract (taking both
     // generators)
-    let r = KeyPair::new_random();
+    let r = random_secret_key();
     let mut R_hat = G.clone();
-    R_hat.mul_assign(&*SECP, &r.secret_key).unwrap();
+    R_hat.mul_assign(&*SECP, &r).unwrap();
 
     let mut R = Y.clone();
-    R.mul_assign(&*SECP, &r.secret_key).unwrap();
+    R.mul_assign(&*SECP, &r).unwrap();
 
-    let proof = dleq::prove(&R_hat, &Y, &R, &r.secret_key);
+    let proof = dleq::prove(&G, &R_hat, &Y, &R, &r);
 
     // TODO: implement x_coor_mod_q() -> SecretKey on XCoor
-    let Rx = r.public_key.x_coor().mod_floor(&*CURVE_ORDER);
+    let Rx = R_hat.x_coor().mod_floor(&*CURVE_ORDER);
     let Rx = SecretKey::from_bigint(&Rx).unwrap();
 
     let mut s_hat = Rx.clone();
@@ -73,7 +74,7 @@ pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSign
         .unwrap();
 
     // TODO: implement invert on secp256k1::SecretKey
-    let r_inv = r.secret_key.to_bigint().invert(&*CURVE_ORDER).unwrap();
+    let r_inv = r.to_bigint().invert(&*CURVE_ORDER).unwrap();
     let r_inv = SecretKey::from_bigint(&r_inv).unwrap();
 
     s_hat.mul_assign(&*SECP, &r_inv).unwrap();
@@ -128,14 +129,12 @@ mod tests {
     use secp256k1zkp::Message;
 
     #[test]
-    fn test_own_sign() {
+    fn valid_signature_using_secp() {
         let x = KeyPair::new_random();
         let message_hash = b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh";
         let _message_hash = &Message::from_slice(message_hash).unwrap();
 
         let signature = sign(&x, message_hash);
-
-        // let signature = SECP.sign(message_hash, &x.secret_key).unwrap();
 
         assert!(SECP
             .verify(_message_hash, &signature.into(), &x.public_key)
@@ -143,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_own_verify() {
+    fn sign_and_verify() {
         let x = KeyPair::new_random();
         let message_hash = b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh";
 
