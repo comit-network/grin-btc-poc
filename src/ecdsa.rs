@@ -1,4 +1,6 @@
-use crate::keypair::{KeyPair, ToBigInt, XCoor, CURVE_ORDER, HALF_CURVE_ORDER, SECP};
+use crate::keypair::{
+    ConvertBigInt, KeyPair, PublicKey, SecretKey, XCoor, CURVE_ORDER, G, HALF_CURVE_ORDER, SECP,
+};
 use gmp::mpz::Mpz;
 use std::borrow::Borrow;
 
@@ -33,6 +35,26 @@ fn sign(x: &KeyPair, message_hash: &[u8]) -> Signature {
     Signature { s, Rx }
 }
 
+fn verify(X: &PublicKey, message_hash: &[u8], signature: &Signature) -> bool {
+    let message_hash = Mpz::from(message_hash);
+
+    let s_inv = signature.s.invert(&*CURVE_ORDER).unwrap();
+
+    let u0 = (message_hash * s_inv.clone()).mod_floor(&*CURVE_ORDER);
+    let u1 = (signature.Rx.clone() * s_inv).mod_floor(&*CURVE_ORDER);
+
+    let mut U0 = G.clone();
+    U0.mul_assign(&*SECP, &SecretKey::from_bigint(&u0).unwrap())
+        .unwrap();
+    let mut U1 = X.clone();
+    U1.mul_assign(&*SECP, &SecretKey::from_bigint(&u1).unwrap())
+        .unwrap();
+
+    let R_tag = PublicKey::from_combination(&*SECP, vec![&U0, &U1]).unwrap();
+
+    R_tag.x_coor() == signature.Rx
+}
+
 impl From<Signature> for secp256k1zkp::Signature {
     fn from(from: Signature) -> Self {
         let mut buffer = [0u8; 64];
@@ -50,9 +72,10 @@ impl From<Signature> for secp256k1zkp::Signature {
 
 mod tests {
     use super::*;
+    use secp256k1zkp::Message;
 
     #[test]
-    fn sign_test() {
+    fn test_own_sign() {
         let x = KeyPair::new_random();
         let message_hash = b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh";
         let _message_hash = &Message::from_slice(message_hash).unwrap();
@@ -64,5 +87,15 @@ mod tests {
         assert!(SECP
             .verify(_message_hash, &signature.into(), &x.public_key)
             .is_ok())
+    }
+
+    #[test]
+    fn test_own_verify() {
+        let x = KeyPair::new_random();
+        let message_hash = b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh";
+
+        let signature = sign(&x, message_hash);
+
+        assert!(verify(&x.public_key, message_hash, &signature))
     }
 }
