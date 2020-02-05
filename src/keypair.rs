@@ -53,6 +53,10 @@ pub fn verify_ecdsa(msg: &Message, sig: &Signature, pk: &PublicKey) -> bool {
 
 pub trait XCoor {
     fn x_coor(&self) -> Mpz;
+    fn x_coor_mod_q(&self) -> SecretKey {
+        let x_coor = self.x_coor().mod_floor(&*CURVE_ORDER);
+        SecretKey::from_bigint(&x_coor).unwrap()
+    }
 }
 
 impl XCoor for PublicKey {
