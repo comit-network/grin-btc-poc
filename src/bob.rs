@@ -3,19 +3,24 @@ use crate::{
     commit::Commitment,
     ecdsa, grin, keypair,
     messages::{Message0, Message1, Message2, Message3},
-    setup_parameters::SetupParameters,
+    setup_parameters::{self, SetupParameters},
 };
 use secp256k1zkp::Message;
 
 pub struct Bob0 {
     init: SetupParameters,
+    secret_grin_init: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     alice_commitment: Commitment,
 }
 
 impl Bob0 {
-    pub fn new(init: SetupParameters, message0: Message0) -> (Bob0, Message1) {
+    pub fn new(
+        init: SetupParameters,
+        secret_grin_init: setup_parameters::GrinRedeemerSecret,
+        message0: Message0,
+    ) -> (Bob0, Message1) {
         let SKs_alpha = grin::SKs::keygen();
         let SKs_beta = bitcoin::SKs::keygen();
 
@@ -28,6 +33,7 @@ impl Bob0 {
 
         let state = Bob0 {
             init,
+            secret_grin_init,
             SKs_alpha,
             SKs_beta,
             alice_commitment,
@@ -56,6 +62,8 @@ impl Bob0 {
 
         Ok((
             Bob1 {
+                init: self.init,
+                secret_grin_init: self.secret_grin_init,
                 SKs_alpha: self.SKs_alpha,
                 SKs_beta: self.SKs_beta,
                 alice_PKs_grin,
@@ -71,6 +79,8 @@ impl Bob0 {
 }
 
 pub struct Bob1 {
+    init: SetupParameters,
+    secret_grin_init: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     alice_PKs_grin: grin::PKs,

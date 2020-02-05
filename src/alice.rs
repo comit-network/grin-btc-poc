@@ -3,7 +3,7 @@ use crate::{
     commit::{Commitment, Opening},
     grin, keypair,
     messages::{Message0, Message1, Message2},
-    setup_parameters::SetupParameters,
+    setup_parameters::{self, SetupParameters},
 };
 use secp256k1zkp::Message;
 
@@ -11,13 +11,17 @@ use secp256k1zkp::Message;
 // ignore them since we don't know how we are gonna tackle them
 pub struct Alice0 {
     init: SetupParameters,
+    secret_grin_init: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     y: keypair::KeyPair,
 }
 
 impl Alice0 {
-    pub fn new(init: SetupParameters) -> (Self, Message0) {
+    pub fn new(
+        init: SetupParameters,
+        secret_grin_init: setup_parameters::GrinFunderSecret,
+    ) -> (Self, Message0) {
         let SKs_alpha = grin::SKs::keygen();
         let SKs_beta = bitcoin::SKs::keygen();
         let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
@@ -27,6 +31,7 @@ impl Alice0 {
 
         let state = Alice0 {
             init,
+            secret_grin_init,
             SKs_alpha,
             SKs_beta,
             y,
@@ -52,6 +57,7 @@ impl Alice0 {
 
         let state = Alice1 {
             init: self.init,
+            secret_grin_init: self.secret_grin_init,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
             bob_PKs_alpha: message1.PKs_grin,
@@ -64,6 +70,7 @@ impl Alice0 {
 
 pub struct Alice1 {
     init: SetupParameters,
+    secret_grin_init: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bob_PKs_alpha: grin::PKs,

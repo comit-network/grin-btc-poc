@@ -1,4 +1,7 @@
-use crate::bitcoin::OutPoint;
+use crate::{
+    bitcoin::OutPoint,
+    keypair::{KeyPair, PublicKey},
+};
 
 #[derive(Debug, Clone)]
 pub struct SetupParameters {
@@ -11,6 +14,37 @@ pub struct Grin {
     pub amount: u64,
     pub fee: u64, // for simplicity we don't model separate fee values for different transactions
     pub expiry: u64, // block height
+    pub fund_input_key: PublicKey,
+    pub redeem_output_key: PublicKey,
+    pub refund_output_key: PublicKey,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrinFunderSecret {
+    pub fund_input_key: KeyPair,
+    pub refund_output_key: KeyPair,
+}
+
+impl GrinFunderSecret {
+    pub fn new_random() -> Self {
+        Self {
+            fund_input_key: KeyPair::new_random(),
+            refund_output_key: KeyPair::new_random(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GrinRedeemerSecret {
+    pub redeem_output_key: KeyPair,
+}
+
+impl GrinRedeemerSecret {
+    pub fn new_random() -> Self {
+        Self {
+            redeem_output_key: KeyPair::new_random(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

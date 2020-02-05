@@ -1,17 +1,26 @@
 use grin_btc_poc::{
     alice::{Alice0, Alice1},
     bob::{Bob0, Bob1},
-    setup_parameters::{Bitcoin, Grin, SetupParameters},
+    setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
 };
 use std::str::FromStr;
 
 fn main() {
+    let grin_funder_secret_init = GrinFunderSecret::new_random();
+    let grin_redeemer_secret_init = GrinRedeemerSecret::new_random();
+
     // TODO: Use proper setup parameters
     let init = SetupParameters {
         alpha: Grin {
             amount: 10_000_000_000,
             fee: 8_000_000,
             expiry: 0,
+            fund_input_key: grin_funder_secret_init.fund_input_key.public_key.clone(),
+            redeem_output_key: grin_redeemer_secret_init
+                .redeem_output_key
+                .public_key
+                .clone(),
+            refund_output_key: grin_funder_secret_init.refund_output_key.public_key.clone(),
         },
         beta: Bitcoin::new(
             100_000_000,
@@ -34,9 +43,9 @@ fn main() {
         .expect("cannot fail"),
     };
 
-    let (alice0, message0) = Alice0::new(init.clone());
+    let (alice0, message0) = Alice0::new(init.clone(), grin_funder_secret_init);
 
-    let (bob0, message1) = Bob0::new(init, message0);
+    let (bob0, message1) = Bob0::new(init, grin_redeemer_secret_init, message0);
 
     let (alice1, message2) = alice0.receive(message1).expect("message1");
 
