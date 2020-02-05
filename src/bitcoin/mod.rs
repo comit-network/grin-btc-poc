@@ -2,6 +2,7 @@ use crate::keypair::{KeyPair, PublicKey};
 use rand::Rng;
 
 pub mod action;
+pub mod sign;
 pub mod transaction;
 
 pub use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents, Address, OutPoint};

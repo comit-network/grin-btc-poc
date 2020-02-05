@@ -45,60 +45,14 @@ impl Bob0 {
     ) -> Result<(Bob1, Message3), ()> {
         let (alice_PKs_grin, alice_PKs_bitcoin, Y) = opening.open(self.alice_commitment)?;
 
-        let (fund_transaction, fund_output_script) = bitcoin::transaction::fund_transaction(
-            &self.init.beta,
-            &alice_PKs_bitcoin.X,
-            &self.SKs_beta.x.public_key,
-        );
-
-        let fund_action = bitcoin::action::Fund {
-            transaction: fund_transaction.clone(),
-            inputs: self
-                .init
-                .beta
-                .inputs
-                .iter()
-                .map(|(i, _)| i.clone())
-                .collect(),
-        };
-
-        let refund_transaction =
-            bitcoin::transaction::refund_transaction(&self.init.beta, fund_transaction.txid());
-
-        let refund_digest = bitcoin::SighashComponents::new(&refund_transaction).sighash_all(
-            &refund_transaction.input[0],
-            &fund_output_script,
-            fund_transaction.output[0].value,
-        );
-        let refund_digest = Message::from_slice(&refund_digest.into_inner())
-            .expect("Should not fail because it is a hash");
-
-        if !keypair::verify_ecdsa(
-            &refund_digest,
-            &alice_beta_refund_signature,
-            &alice_PKs_bitcoin.X,
-        ) {
-            return Err(());
-        }
-
-        let bob_beta_refund_signature = self.SKs_beta.x.sign_ecdsa(&refund_digest);
-
-        let refund_action = bitcoin::action::Refund::new(
-            refund_transaction,
-            alice_beta_refund_signature,
-            bob_beta_refund_signature,
-        );
-
-        let redeem_transaction =
-            bitcoin::transaction::redeem_transaction(&self.init.beta, fund_transaction.txid());
-        let redeem_digest = bitcoin::SighashComponents::new(&redeem_transaction).sighash_all(
-            &redeem_transaction.input[0],
-            &fund_output_script,
-            fund_transaction.output[0].value,
-        );
-
-        let bob_beta_encrypted_redeem_signature =
-            ecdsa::encsign(&self.SKs_beta.x, &Y, &redeem_digest);
+        let (fund_action, refund_action, bob_beta_encrypted_redeem_signature) =
+            bitcoin::sign::funder(
+                &self.init.beta,
+                &self.SKs_beta,
+                &alice_PKs_bitcoin,
+                &Y,
+                &alice_beta_refund_signature,
+            )?;
 
         Ok((
             Bob1 {

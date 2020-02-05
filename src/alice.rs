@@ -36,32 +36,14 @@ impl Alice0 {
     }
 
     pub fn receive(self, message1: Message1) -> Result<(Alice1, Message2), ()> {
-        // TODO: Include first phase of signing in this message. It should depend on
-        // whether we are doing grin-btc or btc-grin
         let opening = Opening::new(
             self.SKs_alpha.public(),
             self.SKs_beta.public(),
             self.y.public_key,
         );
 
-        let (fund_transaction, fund_output_script) = bitcoin::transaction::fund_transaction(
-            &self.init.beta,
-            &self.SKs_beta.x.public_key,
-            &message1.PKs_bitcoin.X,
-        );
-
-        let refund_transaction =
-            bitcoin::transaction::refund_transaction(&self.init.beta, fund_transaction.txid());
-
-        let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
-            &refund_transaction.input[0],
-            &fund_output_script,
-            fund_transaction.output[0].value,
-        );
-        let refund_digest = Message::from_slice(&refund_digest.into_inner())
-            .expect("Should not fail because it is a hash");
-
-        let alice_beta_refund_signature = self.SKs_beta.x.sign_ecdsa(&refund_digest);
+        let alice_beta_refund_signature =
+            bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message1.PKs_bitcoin);
 
         let message = Message2 {
             opening,
