@@ -1,5 +1,6 @@
 use crate::{bitcoin, grin, keypair};
 use blake2::{Blake2b, Digest};
+use secp256k1zkp::PublicKey;
 
 pub struct Commitment([u8; 64]);
 
@@ -40,11 +41,11 @@ impl Opening {
         }
     }
 
-    pub fn open(self, commitment: Commitment) -> Result<(grin::PKs, bitcoin::PKs), ()> {
+    pub fn open(self, commitment: Commitment) -> Result<(grin::PKs, bitcoin::PKs, PublicKey), ()> {
         let self_commitment = Commitment::commit(&self.PKs_grin, &self.PKs_bitcoin, &self.Y);
 
         if &commitment.0[..] == &self_commitment.0[..] {
-            Ok((self.PKs_grin, self.PKs_bitcoin))
+            Ok((self.PKs_grin, self.PKs_bitcoin, self.Y))
         } else {
             Err(())
         }
