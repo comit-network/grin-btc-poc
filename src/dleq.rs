@@ -1,4 +1,4 @@
-use crate::keypair::{ConvertBigInt, KeyPair, PublicKey, SecretKey, CURVE_ORDER, SECP};
+use crate::keypair::{KeyPair, PublicKey, SecretKey, SECP};
 use sha2::{Digest, Sha256};
 
 pub struct Proof {
@@ -79,6 +79,7 @@ pub fn verify(
     proof.c == c
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::keypair::{random_secret_key, G};

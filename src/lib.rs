@@ -9,4 +9,5 @@ pub mod ecdsa;
 pub mod grin;
 pub mod keypair;
 pub mod messages;
+pub mod schnorr;
 pub mod setup_parameters;

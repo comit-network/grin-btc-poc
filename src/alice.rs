@@ -1,11 +1,10 @@
 use crate::{
-    bitcoin::{self, Hash, SighashComponents},
+    bitcoin,
     commit::{Commitment, Opening},
     grin, keypair,
-    messages::{Message0, Message1, Message2},
+    messages::{Message0, Message1, Message2, Message3, Message4},
     setup_parameters::{self, SetupParameters},
 };
-use secp256k1zkp::Message;
 
 // TODO: Figure out what to do with bulletproof keys, if anything. For now,
 // ignore them since we don't know how we are gonna tackle them
@@ -48,11 +47,11 @@ impl Alice0 {
         );
 
         let alice_beta_refund_signature =
-            bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message1.PKs_bitcoin);
+            bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message1.PKs_beta);
 
         let message = Message2 {
             opening,
-            alice_beta_refund_signature,
+            beta_redeemer_signatures: alice_beta_refund_signature,
         };
 
         let state = Alice1 {
@@ -60,8 +59,9 @@ impl Alice0 {
             secret_grin_init: self.secret_grin_init,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
-            bob_PKs_alpha: message1.PKs_grin,
-            bob_PKs_beta: message1.PKs_bitcoin,
+            bob_PKs_alpha: message1.PKs_alpha,
+            bob_PKs_beta: message1.PKs_beta,
+            y: self.y,
         };
 
         Ok((state, message))
@@ -75,4 +75,26 @@ pub struct Alice1 {
     SKs_beta: bitcoin::SKs,
     bob_PKs_alpha: grin::PKs,
     bob_PKs_beta: bitcoin::PKs,
+    y: keypair::KeyPair,
 }
+
+impl Alice1 {
+    pub fn receive(self, message: Message3) -> Result<(Alice2, Message4), ()> {
+        grin::sign::funder(
+            &self.init.alpha,
+            &self.secret_grin_init,
+            &self.SKs_alpha,
+            &self.bob_PKs_alpha,
+            &self.y.public_key,
+            message.alpha_redeemer_signatures,
+        )
+        .map_err(|e| {
+            println!("Grin signature verification failed: {:?}", e);
+            ()
+        })?;
+
+        Ok((Alice2, Message4))
+    }
+}
+
+pub struct Alice2;

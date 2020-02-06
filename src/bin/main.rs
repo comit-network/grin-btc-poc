@@ -1,11 +1,11 @@
 use grin_btc_poc::{
-    alice::{Alice0, Alice1},
-    bob::{Bob0, Bob1},
+    alice::Alice0,
+    bob::Bob0,
     setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
 };
 use std::str::FromStr;
 
-fn main() {
+fn main() -> Result<(), ()> {
     let grin_funder_secret_init = GrinFunderSecret::new_random();
     let grin_redeemer_secret_init = GrinRedeemerSecret::new_random();
 
@@ -47,7 +47,17 @@ fn main() {
 
     let (bob0, message1) = Bob0::new(init, grin_redeemer_secret_init, message0);
 
+    "alice0 receive";
+
     let (alice1, message2) = alice0.receive(message1).expect("message1");
 
-    let bob1 = bob0.receive(message2);
+    "bob0 receive";
+
+    let (bob1, message3) = bob0.receive(message2)?;
+
+    "alice1 receive";
+
+    alice1.receive(message3)?;
+
+    Ok(())
 }

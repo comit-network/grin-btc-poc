@@ -13,6 +13,11 @@ lazy_static::lazy_static! {
         vec.extend(&secp256k1zkp::constants::GENERATOR_G[..]);
         PublicKey::from_slice(&*SECP, &vec).unwrap()
     };
+    pub static ref MINUS_ONE: SecretKey = {
+        let mut one = secp256k1zkp::key::ONE_KEY;
+        one.neg_assign(&*SECP).unwrap();
+        one
+    };
 }
 
 #[derive(Debug, Clone)]
@@ -52,20 +57,40 @@ pub fn verify_ecdsa(msg: &Message, sig: &Signature, pk: &PublicKey) -> bool {
 }
 
 pub trait XCoor {
-    fn x_coor(&self) -> Mpz;
+    fn x_coor(&self) -> [u8; 32];
     fn x_coor_mod_q(&self) -> SecretKey {
-        let x_coor = self.x_coor().mod_floor(&*CURVE_ORDER);
+        let x_coor = Mpz::from(&self.x_coor()[..]).mod_floor(&*CURVE_ORDER);
         SecretKey::from_bigint(&x_coor).unwrap()
     }
 }
 
 impl XCoor for PublicKey {
-    fn x_coor(&self) -> Mpz {
+    fn x_coor(&self) -> [u8; 32] {
         let serialized_pk = self.serialize_vec(&*SECP, false);
-        let x = &serialized_pk[1..serialized_pk.len() / 2 + 1];
-        let x_vec = x.to_vec();
 
-        Mpz::from(&x_vec[..])
+        let mut x_coor = [0u8; 32];
+        x_coor.copy_from_slice(&serialized_pk[1..serialized_pk.len() / 2 + 1]);
+        x_coor
+    }
+}
+
+pub trait Negate {
+    fn negate(&self) -> Self;
+}
+
+impl Negate for PublicKey {
+    fn negate(&self) -> Self {
+        let mut negated = self.clone();
+        negated.mul_assign(&*SECP, &*MINUS_ONE).unwrap();
+        negated
+    }
+}
+
+impl Negate for SecretKey {
+    fn negate(&self) -> Self {
+        let mut negated = self.clone();
+        negated.neg_assign(&*SECP).unwrap();
+        negated
     }
 }
 

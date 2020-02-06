@@ -1,5 +1,14 @@
-use crate::keypair::{KeyPair, PublicKey};
+use crate::keypair::{KeyPair, Negate, PublicKey, SecretKey, XCoor, G, SECP};
 use rand::Rng;
+use sha2::{Digest, Sha256};
+
+pub mod sign;
+
+pub use grin_core::{
+    core::KernelFeatures,
+    libtx::aggsig::{calculate_partial_sig, verify_partial_sig},
+};
+pub use sign::GrinRedeemerSignatures;
 
 #[derive(Debug, Clone)]
 pub struct SKs {
@@ -40,4 +49,34 @@ pub struct PKs {
     pub R_fund: PublicKey,
     pub R_redeem: PublicKey,
     pub R_refund: PublicKey,
+}
+
+pub fn compute_public_excess(
+    inputs: Vec<&PublicKey>,
+    outputs: Vec<&PublicKey>,
+    offset: &SecretKey,
+) -> PublicKey {
+    let negated_inputs: Vec<PublicKey> = inputs.iter().map(|i| i.negate()).collect();
+    let total_inputs =
+        PublicKey::from_combination(&*SECP, negated_inputs.iter().map(|i| i).collect()).unwrap();
+
+    let total_outputs = PublicKey::from_combination(&*SECP, outputs).unwrap();
+
+    let mut offsetG = G.clone();
+    offsetG.mul_assign(&*SECP, &offset).unwrap();
+    PublicKey::from_combination(&*SECP, vec![
+        &total_inputs,
+        &total_outputs,
+        &offsetG.negate(),
+    ])
+    .unwrap()
+}
+
+pub fn compute_offset(funder_R: &PublicKey, redeemer_R: &PublicKey) -> SecretKey {
+    let mut hasher = Sha256::default();
+
+    hasher.input(&funder_R.x_coor());
+    hasher.input(&redeemer_R.x_coor());
+
+    SecretKey::from_slice(&*SECP, &hasher.result()).unwrap()
 }

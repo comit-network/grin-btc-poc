@@ -5,14 +5,13 @@ use crate::{
         HALF_CURVE_ORDER, SECP,
     },
 };
-use gmp::mpz::Mpz;
-use std::borrow::Borrow;
 
 pub struct Signature {
     s: SecretKey,
     R_x: SecretKey,
 }
 
+#[allow(dead_code)]
 fn sign(x: &KeyPair, message_hash: &[u8]) -> Signature {
     let r = KeyPair::new_random();
 
@@ -88,6 +87,7 @@ pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSign
 
 /// ECDSA verification
 /// Does not check low s
+#[allow(dead_code)]
 fn verify(X: &PublicKey, message_hash: &[u8], signature: &Signature) -> bool {
     let message_hash = SecretKey::from_slice(&*SECP, message_hash).unwrap();
 
@@ -161,7 +161,7 @@ pub fn encverify(
 
     let R_hat_candidate = PublicKey::from_combination(&*SECP, vec![&U0, &U1]).unwrap();
 
-    if dbg!(&R_hat_candidate) == dbg!(R_hat) {
+    if &R_hat_candidate == R_hat {
         Ok(())
     } else {
         Err(EncVerifyError::Invalid)
@@ -179,6 +179,7 @@ impl From<Signature> for secp256k1zkp::Signature {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use secp256k1zkp::Message;
