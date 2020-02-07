@@ -94,6 +94,15 @@ impl Negate for SecretKey {
     }
 }
 
+impl Negate for KeyPair {
+    fn negate(&self) -> Self {
+        KeyPair {
+            secret_key: self.secret_key.negate(),
+            public_key: self.public_key.negate(),
+        }
+    }
+}
+
 pub trait ConvertBigInt: Sized {
     fn to_bigint(&self) -> Mpz;
     fn from_bigint(from: &Mpz) -> Option<Self>;

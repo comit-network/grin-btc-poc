@@ -1,6 +1,6 @@
 use crate::{
     grin::{self, PKs, SKs},
-    keypair::{Negate, PublicKey, G, SECP},
+    keypair::{KeyPair, Negate, PublicKey, G, SECP},
     schnorr, setup_parameters,
 };
 
@@ -38,8 +38,6 @@ pub fn redeemer(
         let mut half_kernel_sk = redeemer_SKs.x.secret_key.clone();
         half_kernel_sk.add_assign(&*SECP, &offset.negate()).unwrap();
 
-        crate::keypair::KeyPair::new(half_kernel_sk.clone()).public_key;
-        // WARNING: This might change the R value if R_y is not a quadratic residue.
         let signature = grin::calculate_partial_sig(
             &*SECP,
             &half_kernel_sk,
@@ -51,7 +49,7 @@ pub fn redeemer(
                 .unwrap(),
         )
         .expect("could not calculate partial signature");
-        schnorr::PartialSignature::from(&signature)
+        schnorr::PartialSignature::from(signature)
     };
 
     // refund
@@ -86,43 +84,28 @@ pub fn redeemer(
             .unwrap(),
         )
         .expect("could not calculate partial signature");
-        schnorr::PartialSignature::from(&signature)
+        schnorr::PartialSignature::from(signature)
     };
 
     // redeem
     let s_hat_redeem = {
         let offset = grin::compute_offset(&funder_PKs.R_redeem, &redeemer_SKs.r_redeem.public_key);
-        let X_redeem = grin::compute_public_excess(
-            vec![&funder_PKs.X, &redeemer_SKs.x.public_key],
-            vec![&init.redeem_output_key],
-            &offset,
-        );
-
-        let R_redeem = PublicKey::from_combination(&*SECP, vec![
-            &funder_PKs.R_redeem,
-            &redeemer_SKs.r_redeem.public_key,
-            &Y,
-        ])
-        .unwrap();
-
         let mut half_kernel_sk = (redeemer_SKs.x.secret_key).negate();
         half_kernel_sk
             .add_assign(&*SECP, &secret_init.redeem_output_key.secret_key)
             .unwrap();
         half_kernel_sk.add_assign(&*SECP, &offset.negate()).unwrap();
 
-        let signature = grin::calculate_partial_sig(
-            &*SECP,
-            &half_kernel_sk,
-            &redeemer_SKs.r_redeem.secret_key,
-            &R_redeem,
-            Some(&X_redeem),
+        schnorr::encsign_2p_0(
+            &KeyPair::new(half_kernel_sk),
+            &redeemer_SKs.r_redeem,
+            &(funder_PKs.X).negate(),
+            &funder_PKs.R_redeem,
+            &Y,
             &grin::KernelFeatures::Plain { fee: init.fee }
                 .kernel_sig_msg()
                 .unwrap(),
         )
-        .expect("could not calculate partial signature");
-        schnorr::PartialSignature::from(&signature)
     };
 
     GrinRedeemerSignatures {
@@ -225,15 +208,9 @@ pub fn funder(
         .map_err(|_| RedeemerSignatureError::Refund)?
     }
 
-    // verify redeemer redeem encrypted half-signature
-    {
-        let R_redeem = PublicKey::from_combination(&*SECP, vec![
-            &funder_SKs.r_redeem.public_key,
-            &redeemer_PKs.R_redeem,
-            &Y,
-        ])
-        .unwrap();
-
+    // verify redeemer redeem encrypted half-signature and return full encrypted
+    // signature
+    let encsign_redeem = {
         let offset = grin::compute_offset(&funder_SKs.r_redeem.public_key, &redeemer_PKs.R_redeem);
         let mut offsetG = G.clone();
         offsetG.mul_assign(&*SECP, &offset).unwrap();
@@ -245,25 +222,19 @@ pub fn funder(
         ])
         .unwrap();
 
-        let X_redeem = grin::compute_public_excess(
-            vec![&funder_SKs.x.public_key, &redeemer_PKs.X],
-            vec![&init.redeem_output_key],
-            &offset,
-        );
-
-        let sig_hat_redeem_redeemer = s_hat_redeem_redeemer.to_signature(&redeemer_PKs.R_redeem);
-        grin::verify_partial_sig(
-            &*SECP,
-            &sig_hat_redeem_redeemer,
-            &R_redeem,
+        schnorr::encsign_2p_1(
+            &funder_SKs.x.negate(),
+            &funder_SKs.r_redeem,
             &half_kernel_pk,
-            Some(&X_redeem),
+            &redeemer_PKs.R_redeem,
+            &Y,
             &grin::KernelFeatures::Plain { fee: init.fee }
                 .kernel_sig_msg()
                 .unwrap(),
+            &s_hat_redeem_redeemer,
         )
-        .map_err(|_| RedeemerSignatureError::Redeem)?
-    }
+        .map_err(|_| RedeemerSignatureError::Redeem)?;
+    };
 
     Ok(())
 }

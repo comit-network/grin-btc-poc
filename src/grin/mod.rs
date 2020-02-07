@@ -6,7 +6,7 @@ pub mod sign;
 
 pub use grin_core::{
     core::KernelFeatures,
-    libtx::aggsig::{calculate_partial_sig, verify_partial_sig},
+    libtx::aggsig::{add_signatures, calculate_partial_sig, verify_partial_sig},
 };
 pub use sign::GrinRedeemerSignatures;
 
