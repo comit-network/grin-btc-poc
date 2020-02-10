@@ -1,6 +1,6 @@
 use crate::{
     grin::{self, PKs, SKs},
-    keypair::{KeyPair, Negate, PublicKey, G, SECP},
+    keypair::{KeyPair, Negate, PublicKey, SECP},
     schnorr, setup_parameters,
 };
 
@@ -101,6 +101,11 @@ pub enum RedeemerSignatureError {
     Refund,
 }
 
+pub struct GrinFunderActions {
+    pub fund: grin::action::Fund,
+    pub refund: grin::action::Refund,
+}
+
 pub fn funder(
     init: &setup_parameters::Grin,
     secret_init: &setup_parameters::GrinFunderSecret,
@@ -112,10 +117,8 @@ pub fn funder(
         s_refund: s_refund_redeemer,
         s_hat_redeem: s_hat_redeem_redeemer,
     }: GrinRedeemerSignatures,
-) -> Result<(GrinFunderActions), RedeemerSignatureError> {
-    // TODO: Generate actions to put in state
-
-    let fund_signature = {
+) -> Result<(GrinFunderActions, schnorr::EncryptedSignature), RedeemerSignatureError> {
+    let fund = {
         let offset = grin::compute_offset(&funder_SKs.r_fund.public_key, &redeemer_PKs.R_fund);
 
         let half_excess_sk_funder = {
@@ -129,20 +132,39 @@ pub fn funder(
         let half_excess_pk_redeemer =
             grin::compute_excess_pk(vec![], vec![&redeemer_PKs.X], Some(&offset)).unwrap();
 
-        schnorr::sign_2p_1(
+        let kernel_features = grin::KernelFeatures::Plain { fee: init.fee };
+
+        let (excess_sig, excess) = schnorr::sign_2p_1(
             &half_excess_sk_funder,
             &funder_SKs.r_fund,
             &half_excess_pk_redeemer,
             &redeemer_PKs.R_fund,
-            &grin::KernelFeatures::Plain { fee: init.fee }
-                .kernel_sig_msg()
-                .unwrap(),
+            &kernel_features.kernel_sig_msg().unwrap(),
             &s_fund_redeemer,
         )
-        .map_err(|_| RedeemerSignatureError::Fund)?
+        .map_err(|_| RedeemerSignatureError::Fund)?;
+
+        grin::action::Fund::new(
+            &vec![(
+                init.fund_input_amount(),
+                secret_init.fund_input_key.public_key,
+            )],
+            &vec![(
+                init.fund_output_amount(),
+                PublicKey::from_combination(&*SECP, vec![
+                    &funder_SKs.x.public_key,
+                    &redeemer_PKs.X,
+                ])
+                .unwrap(),
+            )],
+            &excess,
+            &excess_sig,
+            &kernel_features,
+            &secret_init.fund_input_key,
+        )
     };
 
-    let refund_signature = {
+    let refund = {
         let offset = grin::compute_offset(&funder_SKs.r_refund.public_key, &redeemer_PKs.R_refund);
 
         let half_excess_sk_funder = {
@@ -156,20 +178,39 @@ pub fn funder(
         let half_excess_pk_redeemer =
             grin::compute_excess_pk(vec![&redeemer_PKs.X], vec![], Some(&offset)).unwrap();
 
-        schnorr::sign_2p_1(
+        let kernel_features = grin::KernelFeatures::HeightLocked {
+            fee: init.fee,
+            lock_height: init.expiry,
+        };
+
+        let (excess_sig, excess) = schnorr::sign_2p_1(
             &half_excess_sk_funder,
             &funder_SKs.r_refund,
             &half_excess_pk_redeemer,
             &redeemer_PKs.R_refund,
-            &grin::KernelFeatures::HeightLocked {
-                fee: init.fee,
-                lock_height: init.expiry,
-            }
-            .kernel_sig_msg()
-            .unwrap(),
+            &kernel_features.kernel_sig_msg().unwrap(),
             &s_refund_redeemer,
         )
-        .map_err(|_| RedeemerSignatureError::Refund)?
+        .map_err(|_| RedeemerSignatureError::Refund)?;
+
+        grin::action::Refund::new(
+            &vec![(
+                init.fund_output_amount(),
+                PublicKey::from_combination(&*SECP, vec![
+                    &funder_SKs.x.public_key,
+                    &redeemer_PKs.X,
+                ])
+                .unwrap(),
+            )],
+            &vec![(
+                init.refund_output_amount(),
+                secret_init.refund_output_key.public_key,
+            )],
+            &excess,
+            &excess_sig,
+            &kernel_features,
+            &secret_init.refund_output_key,
+        )
     };
 
     let encsign_redeem = {
@@ -194,8 +235,8 @@ pub fn funder(
                 .unwrap(),
             &s_hat_redeem_redeemer,
         )
-        .map_err(|_| RedeemerSignatureError::Redeem)?;
+        .map_err(|_| RedeemerSignatureError::Redeem)?
     };
 
-    Ok(())
+    Ok((GrinFunderActions { fund, refund }, encsign_redeem))
 }

@@ -2,8 +2,10 @@ use crate::keypair::{KeyPair, Negate, PublicKey, SecretKey, XCoor, G, SECP};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 
+pub mod action;
 pub mod sign;
 
+pub use crate::schnorr::EncryptedSignature;
 pub use grin_core::{
     core::KernelFeatures,
     libtx::aggsig::{add_signatures, calculate_partial_sig, verify_partial_sig},

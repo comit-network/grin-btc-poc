@@ -30,7 +30,7 @@ pub fn redeemer(
     redeemer_SKs.x.sign_ecdsa(&refund_digest)
 }
 
-// TODO: Modify the spec to only not pass redeemer's redeem signature to funder
+// TODO: Modify the spec to not pass redeemer's redeem signature to funder
 pub fn funder(
     init: &setup_parameters::Bitcoin,
     funder_SKs: &bitcoin::SKs,

@@ -1,7 +1,7 @@
 use crate::{
     bitcoin,
     commit::{Commitment, Opening},
-    ecdsa, grin,
+    grin,
 };
 
 // Sent by Alice
@@ -21,9 +21,11 @@ pub struct Message2 {
 
 // Sent by Bob
 pub struct Message3 {
-    pub beta_encrypted_redeem_signature: ecdsa::EncryptedSignature,
+    pub beta_encrypted_redeem_signature: bitcoin::EncryptedSignature,
     pub alpha_redeemer_signatures: grin::GrinRedeemerSignatures,
 }
 
 // Sent by Alice
-pub struct Message4;
+pub struct Message4 {
+    pub alpha_encrypted_redeem_signature: grin::EncryptedSignature,
+}

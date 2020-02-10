@@ -180,7 +180,7 @@ impl From<Signature> for secp256k1zkp::Signature {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
     use secp256k1zkp::Message;
 

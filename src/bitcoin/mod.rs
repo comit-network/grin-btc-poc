@@ -5,6 +5,7 @@ pub mod action;
 pub mod sign;
 pub mod transaction;
 
+pub use crate::ecdsa::EncryptedSignature;
 pub use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents, Address, OutPoint};
 pub use secp256k1zkp::Signature;
 

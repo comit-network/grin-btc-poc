@@ -80,7 +80,10 @@ pub struct Alice1 {
 
 impl Alice1 {
     pub fn receive(self, message: Message3) -> Result<(Alice2, Message4), ()> {
-        grin::sign::funder(
+        // TODO: Build bitcoin_redeem action by decrypting
+        // message.beta_encrypted_redeem_signature
+
+        let (grin_actions, redeem_encsig) = grin::sign::funder(
             &self.init.alpha,
             &self.secret_grin_init,
             &self.SKs_alpha,
@@ -93,8 +96,37 @@ impl Alice1 {
             ()
         })?;
 
-        Ok((Alice2, Message4))
+        // TODO: Move this code to bitcoin module
+        let bitcoin_redeem_transaction = bitcoin::transaction::redeem_transaction(
+            &self.init.beta,
+            bitcoin::transaction::fund_transaction(
+                &self.init.beta,
+                &self.SKs_beta.x.public_key,
+                &self.bob_PKs_beta.X,
+            )
+            .0
+            .txid(),
+        );
+
+        Ok((
+            Alice2 {
+                alpha_fund_action: grin_actions.fund,
+                alpha_refund_action: grin_actions.refund,
+                beta_redeem_action: bitcoin::action::Redeem {
+                    transaction: bitcoin_redeem_transaction,
+                    encrypted_signature: message.beta_encrypted_redeem_signature,
+                    signature: todo!("missing redeemer's (alice's) signature"),
+                },
+            },
+            Message4 {
+                alpha_encrypted_redeem_signature: redeem_encsig,
+            },
+        ))
     }
 }
 
-pub struct Alice2;
+pub struct Alice2 {
+    alpha_fund_action: grin::action::Fund,
+    alpha_refund_action: grin::action::Refund,
+    beta_redeem_action: bitcoin::action::Redeem,
+}

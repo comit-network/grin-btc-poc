@@ -1,7 +1,7 @@
 use gmp::mpz::Mpz;
 use rand::Rng;
 pub use secp256k1zkp::key::{PublicKey, SecretKey};
-use secp256k1zkp::{ContextFlag, Message, Secp256k1, Signature};
+use secp256k1zkp::{pedersen, ContextFlag, Message, Secp256k1, Signature};
 use std::borrow::Borrow;
 
 lazy_static::lazy_static! {
@@ -11,6 +11,11 @@ lazy_static::lazy_static! {
     pub static ref G: PublicKey = {
         let mut vec = vec![4u8];
         vec.extend(&secp256k1zkp::constants::GENERATOR_G[..]);
+        PublicKey::from_slice(&*SECP, &vec).unwrap()
+    };
+    pub static ref H: PublicKey = {
+        let mut vec = vec![4u8];
+        vec.extend(&secp256k1zkp::constants::GENERATOR_H[..]);
         PublicKey::from_slice(&*SECP, &vec).unwrap()
     };
     pub static ref MINUS_ONE: SecretKey = {
@@ -121,4 +126,46 @@ impl ConvertBigInt for SecretKey {
 
 pub fn random_secret_key() -> SecretKey {
     SecretKey::from_slice(&*SECP, &rand::thread_rng().gen::<[u8; 32]>()).unwrap()
+}
+
+pub fn build_commitment(pk: &PublicKey) -> pedersen::Commitment {
+    let mut buffer = [0u8; 33];
+
+    // Reverse first 32 bytes of pubkey
+    let mut commit = [0u8; 32];
+    commit.copy_from_slice(&pk.0[0..32]);
+    commit.reverse();
+    buffer[1..33].copy_from_slice(&commit);
+
+    // First byte equal to 0x08 or 0x09 50% of the time
+    // TODO: Determine actual value of first byte
+    buffer[0] = 0x08;
+    // buffer[0] = 0x09;
+
+    pedersen::Commitment::from_vec(buffer.to_vec())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    // Works everytime 50% of the time
+    #[test]
+    fn to_commitment_roundtrip() {
+        let x = KeyPair::new_random();
+        let commit = build_commitment(&x.public_key);
+
+        let theirs = commit.to_pubkey(&*SECP).unwrap();
+        let ours = x.public_key;
+
+        assert_eq!(theirs, ours);
+    }
+    // Works everytime 50% of the time
+    #[test]
+    fn to_commitment_vs_commit() {
+        let x = KeyPair::new_random();
+        let ours = build_commitment(&x.public_key);
+        let theirs = SECP.commit(0, x.secret_key).unwrap();
+
+        assert_eq!(theirs, ours);
+    }
 }

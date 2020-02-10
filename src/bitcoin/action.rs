@@ -1,6 +1,8 @@
-use crate::bitcoin::OutPoint;
+use crate::{
+    bitcoin::{OutPoint, Signature},
+    ecdsa,
+};
 use ::bitcoin::Transaction;
-use secp256k1zkp::Signature;
 
 pub struct Fund {
     pub transaction: Transaction,
@@ -8,9 +10,9 @@ pub struct Fund {
 }
 
 pub struct Refund {
-    transaction: Transaction,
-    alice_signature: Signature,
-    bob_signature: Signature,
+    pub transaction: Transaction,
+    pub alice_signature: Signature,
+    pub bob_signature: Signature,
 }
 
 impl Refund {
@@ -25,4 +27,10 @@ impl Refund {
             bob_signature,
         }
     }
+}
+
+pub struct Redeem {
+    pub transaction: Transaction,
+    pub encrypted_signature: ecdsa::EncryptedSignature,
+    pub signature: Signature,
 }

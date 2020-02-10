@@ -12,7 +12,7 @@ fn main() -> Result<(), ()> {
     // TODO: Use proper setup parameters
     let init = SetupParameters {
         alpha: Grin {
-            amount: 10_000_000_000,
+            asset: 10_000_000_000,
             fee: 8_000_000,
             expiry: 0,
             fund_input_key: grin_funder_secret_init.fund_input_key.public_key.clone(),
@@ -57,7 +57,9 @@ fn main() -> Result<(), ()> {
 
     dbg!("alice1 receive");
 
-    alice1.receive(message3)?;
+    let (alice2, message4) = alice1.receive(message3)?;
+
+    dbg!("TODO: bob1 receive");
 
     Ok(())
 }

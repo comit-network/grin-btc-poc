@@ -80,7 +80,7 @@ pub fn verify(
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
     use crate::keypair::{random_secret_key, G};
 

@@ -39,7 +39,7 @@ pub fn sign_2p_1(
     R0: &PublicKey,
     message: &Message,
     partial_sig_0: &PartialSignature,
-) -> Result<EncryptedSignature, ()> {
+) -> Result<(Signature, PublicKey), ()> {
     let R = PublicKey::from_combination(&*SECP, vec![&r1.public_key, &R0]).unwrap();
     let X = PublicKey::from_combination(&*SECP, vec![&x1.public_key, &X0]).unwrap();
 
@@ -66,7 +66,7 @@ pub fn sign_2p_1(
         return Err(());
     }
 
-    Ok(sig)
+    Ok((sig, X))
 }
 
 pub fn encsign_2p_0(
