@@ -47,15 +47,15 @@ fn main() -> Result<(), ()> {
 
     let (bob0, message1) = Bob0::new(init, grin_redeemer_secret_init, message0);
 
-    "alice0 receive";
+    dbg!("alice0 receive");
 
     let (alice1, message2) = alice0.receive(message1).expect("message1");
 
-    "bob0 receive";
+    dbg!("bob0 receive");
 
     let (bob1, message3) = bob0.receive(message2)?;
 
-    "alice1 receive";
+    dbg!("alice1 receive");
 
     alice1.receive(message3)?;
 

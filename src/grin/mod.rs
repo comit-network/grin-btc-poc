@@ -51,25 +51,36 @@ pub struct PKs {
     pub R_refund: PublicKey,
 }
 
-pub fn compute_public_excess(
+pub fn compute_excess_pk(
     inputs: Vec<&PublicKey>,
     outputs: Vec<&PublicKey>,
-    offset: &SecretKey,
-) -> PublicKey {
-    let negated_inputs: Vec<PublicKey> = inputs.iter().map(|i| i.negate()).collect();
-    let total_inputs =
-        PublicKey::from_combination(&*SECP, negated_inputs.iter().map(|i| i).collect()).unwrap();
-
-    let total_outputs = PublicKey::from_combination(&*SECP, outputs).unwrap();
-
-    let mut offsetG = G.clone();
-    offsetG.mul_assign(&*SECP, &offset).unwrap();
-    PublicKey::from_combination(&*SECP, vec![
-        &total_inputs,
-        &total_outputs,
-        &offsetG.negate(),
-    ])
-    .unwrap()
+    offset: Option<&SecretKey>,
+) -> Result<PublicKey, ()> {
+    let total = match (inputs.clone(), outputs.clone()) {
+        (inputs, outputs) if inputs.is_empty() && outputs.is_empty() => return Err(()),
+        (inputs, outputs) if inputs.is_empty() && !outputs.is_empty() => {
+            PublicKey::from_combination(&*SECP, outputs).unwrap()
+        }
+        (inputs, outputs) if !inputs.is_empty() && outputs.is_empty() => {
+            let negated_inputs: Vec<PublicKey> = inputs.iter().map(|i| i.negate()).collect();
+            let negated_inputs: Vec<&PublicKey> = negated_inputs.iter().map(|i| i).collect();
+            PublicKey::from_combination(&*SECP, negated_inputs).unwrap()
+        }
+        _ => {
+            let negated_inputs: Vec<PublicKey> = inputs.iter().map(|i| i.negate()).collect();
+            let mut total: Vec<&PublicKey> = negated_inputs.iter().map(|i| i).collect();
+            total.extend(outputs);
+            PublicKey::from_combination(&*SECP, total).unwrap()
+        }
+    };
+    match offset {
+        Some(offset) => {
+            let mut offsetG = G.clone();
+            offsetG.mul_assign(&*SECP, &offset).unwrap();
+            Ok(PublicKey::from_combination(&*SECP, vec![&total, &offsetG.negate()]).unwrap())
+        }
+        None => Ok(total),
+    }
 }
 
 pub fn compute_offset(funder_R: &PublicKey, redeemer_R: &PublicKey) -> SecretKey {

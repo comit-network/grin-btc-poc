@@ -19,63 +19,45 @@ pub fn redeemer(
     funder_PKs: &PKs,
     Y: &PublicKey,
 ) -> GrinRedeemerSignatures {
-    // fund
     let s_fund = {
         let offset = grin::compute_offset(&funder_PKs.R_fund, &redeemer_SKs.r_fund.public_key);
         &offset;
-        let X_fund = grin::compute_public_excess(
-            vec![&init.fund_input_key],
-            vec![&funder_PKs.X, &redeemer_SKs.x.public_key],
-            &offset,
-        );
+        let half_excess_pk_funder =
+            grin::compute_excess_pk(vec![&init.fund_input_key], vec![&funder_PKs.X], None).unwrap();
 
-        let R_fund = PublicKey::from_combination(&*SECP, vec![
+        // TODO: Extract into grin::compute_excess_sk
+        let mut half_excess_sk_redeemer = redeemer_SKs.x.secret_key.clone();
+        half_excess_sk_redeemer
+            .add_assign(&*SECP, &offset.negate())
+            .unwrap();
+
+        schnorr::sign_2p_0(
+            &KeyPair::new(half_excess_sk_redeemer),
+            &redeemer_SKs.r_fund,
+            &half_excess_pk_funder,
             &funder_PKs.R_fund,
-            &redeemer_SKs.r_fund.public_key,
-        ])
-        .unwrap();
-
-        let mut half_kernel_sk = redeemer_SKs.x.secret_key.clone();
-        half_kernel_sk.add_assign(&*SECP, &offset.negate()).unwrap();
-
-        let signature = grin::calculate_partial_sig(
-            &*SECP,
-            &half_kernel_sk,
-            &redeemer_SKs.r_fund.secret_key,
-            &R_fund,
-            Some(&X_fund),
             &grin::KernelFeatures::Plain { fee: init.fee }
                 .kernel_sig_msg()
                 .unwrap(),
         )
-        .expect("could not calculate partial signature");
-        schnorr::PartialSignature::from(signature)
     };
 
-    // refund
     let s_refund = {
         let offset = grin::compute_offset(&funder_PKs.R_refund, &redeemer_SKs.r_refund.public_key);
-        let X_refund = grin::compute_public_excess(
-            vec![&funder_PKs.X, &redeemer_SKs.x.public_key],
-            vec![&init.refund_output_key],
-            &offset,
-        );
+        let half_excess_pk_funder =
+            grin::compute_excess_pk(vec![&funder_PKs.X], vec![&init.refund_output_key], None)
+                .unwrap();
 
-        let R_refund = PublicKey::from_combination(&*SECP, vec![
+        let mut half_excess_sk_redeemer = redeemer_SKs.x.secret_key.negate().clone();
+        half_excess_sk_redeemer
+            .add_assign(&*SECP, &offset.negate())
+            .unwrap();
+
+        schnorr::sign_2p_0(
+            &KeyPair::new(half_excess_sk_redeemer),
+            &redeemer_SKs.r_refund,
+            &half_excess_pk_funder,
             &funder_PKs.R_refund,
-            &redeemer_SKs.r_refund.public_key,
-        ])
-        .unwrap();
-
-        let mut half_kernel_sk = redeemer_SKs.x.secret_key.negate().clone();
-        half_kernel_sk.add_assign(&*SECP, &offset.negate()).unwrap();
-
-        let signature = grin::calculate_partial_sig(
-            &*SECP,
-            &half_kernel_sk,
-            &redeemer_SKs.r_refund.secret_key,
-            &R_refund,
-            Some(&X_refund),
             &grin::KernelFeatures::HeightLocked {
                 fee: init.fee,
                 lock_height: init.expiry,
@@ -83,11 +65,8 @@ pub fn redeemer(
             .kernel_sig_msg()
             .unwrap(),
         )
-        .expect("could not calculate partial signature");
-        schnorr::PartialSignature::from(signature)
     };
 
-    // redeem
     let s_hat_redeem = {
         let offset = grin::compute_offset(&funder_PKs.R_redeem, &redeemer_SKs.r_redeem.public_key);
         let mut half_kernel_sk = (redeemer_SKs.x.secret_key).negate();
@@ -133,99 +112,81 @@ pub fn funder(
         s_refund: s_refund_redeemer,
         s_hat_redeem: s_hat_redeem_redeemer,
     }: GrinRedeemerSignatures,
-) -> Result<(), RedeemerSignatureError> {
-    // verify redeemer fund half-signature
-    {
-        let R_fund = PublicKey::from_combination(&*SECP, vec![
-            &funder_SKs.r_fund.public_key,
-            &redeemer_PKs.R_fund,
-        ])
-        .unwrap();
+) -> Result<(GrinFunderActions), RedeemerSignatureError> {
+    // TODO: Generate actions to put in state
 
+    let fund_signature = {
         let offset = grin::compute_offset(&funder_SKs.r_fund.public_key, &redeemer_PKs.R_fund);
-        let mut offsetG = G.clone();
-        offsetG.mul_assign(&*SECP, &offset).unwrap();
 
-        let half_kernel_pk =
-            PublicKey::from_combination(&*SECP, vec![&redeemer_PKs.X, &offsetG.negate()]).unwrap();
+        let half_excess_sk_funder = {
+            let mut half_excess_sk_funder = funder_SKs.x.secret_key.clone();
+            half_excess_sk_funder
+                .add_assign(&*SECP, &secret_init.fund_input_key.secret_key.negate())
+                .unwrap();
 
-        let X_fund = grin::compute_public_excess(
-            vec![&init.fund_input_key],
-            vec![&funder_SKs.x.public_key, &redeemer_PKs.X],
-            &offset,
-        );
+            KeyPair::new(half_excess_sk_funder)
+        };
+        let half_excess_pk_redeemer =
+            grin::compute_excess_pk(vec![], vec![&redeemer_PKs.X], Some(&offset)).unwrap();
 
-        let sig_fund_redeemer = s_fund_redeemer.to_signature(&redeemer_PKs.R_fund);
-        grin::verify_partial_sig(
-            &*SECP,
-            &sig_fund_redeemer,
-            &R_fund,
-            &half_kernel_pk,
-            Some(&X_fund),
+        schnorr::sign_2p_1(
+            &half_excess_sk_funder,
+            &funder_SKs.r_fund,
+            &half_excess_pk_redeemer,
+            &redeemer_PKs.R_fund,
             &grin::KernelFeatures::Plain { fee: init.fee }
                 .kernel_sig_msg()
                 .unwrap(),
+            &s_fund_redeemer,
         )
         .map_err(|_| RedeemerSignatureError::Fund)?
     };
 
-    // verify redeemer refund half-signature
-    {
-        let R_refund = PublicKey::from_combination(&*SECP, vec![
-            &funder_SKs.r_refund.public_key,
-            &redeemer_PKs.R_refund,
-        ])
-        .unwrap();
-
+    let refund_signature = {
         let offset = grin::compute_offset(&funder_SKs.r_refund.public_key, &redeemer_PKs.R_refund);
-        let mut offsetG = G.clone();
-        offsetG.mul_assign(&*SECP, &offset).unwrap();
 
-        let half_kernel_pk =
-            PublicKey::from_combination(&*SECP, vec![&redeemer_PKs.X.negate(), &offsetG.negate()])
+        let half_excess_sk_funder = {
+            let mut half_excess_sk_funder = funder_SKs.x.secret_key.negate();
+            half_excess_sk_funder
+                .add_assign(&*SECP, &secret_init.refund_output_key.secret_key)
                 .unwrap();
 
-        let X_refund = grin::compute_public_excess(
-            vec![&funder_SKs.x.public_key, &redeemer_PKs.X],
-            vec![&init.refund_output_key],
-            &offset,
-        );
+            KeyPair::new(half_excess_sk_funder)
+        };
+        let half_excess_pk_redeemer =
+            grin::compute_excess_pk(vec![&redeemer_PKs.X], vec![], Some(&offset)).unwrap();
 
-        let sig_refund_redeemer = s_refund_redeemer.to_signature(&redeemer_PKs.R_refund);
-        grin::verify_partial_sig(
-            &*SECP,
-            &sig_refund_redeemer,
-            &R_refund,
-            &half_kernel_pk,
-            Some(&X_refund),
+        schnorr::sign_2p_1(
+            &half_excess_sk_funder,
+            &funder_SKs.r_refund,
+            &half_excess_pk_redeemer,
+            &redeemer_PKs.R_refund,
             &grin::KernelFeatures::HeightLocked {
                 fee: init.fee,
                 lock_height: init.expiry,
             }
             .kernel_sig_msg()
             .unwrap(),
+            &s_refund_redeemer,
         )
         .map_err(|_| RedeemerSignatureError::Refund)?
-    }
+    };
 
-    // verify redeemer redeem encrypted half-signature and return full encrypted
-    // signature
     let encsign_redeem = {
         let offset = grin::compute_offset(&funder_SKs.r_redeem.public_key, &redeemer_PKs.R_redeem);
-        let mut offsetG = G.clone();
-        offsetG.mul_assign(&*SECP, &offset).unwrap();
 
-        let half_kernel_pk = PublicKey::from_combination(&*SECP, vec![
-            &init.redeem_output_key,
-            &redeemer_PKs.X.negate(),
-            &offsetG.negate(),
-        ])
+        let half_excess_sk_funder = funder_SKs.x.negate();
+        let half_excess_pk_redeemer = grin::compute_excess_pk(
+            vec![&redeemer_PKs.X],
+            vec![&init.redeem_output_key],
+            Some(&offset),
+        )
         .unwrap();
 
         schnorr::encsign_2p_1(
-            &funder_SKs.x.negate(),
+            &half_excess_sk_funder,
             &funder_SKs.r_redeem,
-            &half_kernel_pk,
+            &half_excess_pk_redeemer,
             &redeemer_PKs.R_redeem,
             &Y,
             &grin::KernelFeatures::Plain { fee: init.fee }

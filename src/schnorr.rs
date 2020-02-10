@@ -10,6 +10,65 @@ pub type PartialEncryptedSignature = PartialSignature;
 #[derive(Debug, Clone)]
 pub struct PartialSignature(pub SecretKey);
 
+pub fn sign_2p_0(
+    x0: &KeyPair,
+    r0: &KeyPair,
+    X1: &PublicKey,
+    R1: &PublicKey,
+    message: &Message,
+) -> PartialSignature {
+    let R = PublicKey::from_combination(&*SECP, vec![&r0.public_key, &R1]).unwrap();
+    let X = PublicKey::from_combination(&*SECP, vec![&x0.public_key, &X1]).unwrap();
+
+    grin::calculate_partial_sig(
+        &*SECP,
+        &x0.secret_key,
+        &r0.secret_key,
+        &R,
+        Some(&X),
+        &message,
+    )
+    .unwrap()
+    .into()
+}
+
+pub fn sign_2p_1(
+    x1: &KeyPair,
+    r1: &KeyPair,
+    X0: &PublicKey,
+    R0: &PublicKey,
+    message: &Message,
+    partial_sig_0: &PartialSignature,
+) -> Result<EncryptedSignature, ()> {
+    let R = PublicKey::from_combination(&*SECP, vec![&r1.public_key, &R0]).unwrap();
+    let X = PublicKey::from_combination(&*SECP, vec![&x1.public_key, &X0]).unwrap();
+
+    let partial_sig_1 = PartialSignature::from(
+        grin::calculate_partial_sig(
+            &*SECP,
+            &x1.secret_key,
+            &r1.secret_key,
+            &R,
+            Some(&X),
+            message,
+        )
+        .unwrap(),
+    );
+
+    let sig = {
+        let mut sig = partial_sig_0.0.clone();
+        sig.add_assign(&*SECP, &partial_sig_1.0).unwrap();
+
+        PartialSignature(sig).to_signature(&R)
+    };
+
+    if !aggsig::verify_single(&*SECP, &sig, message, None, &X, Some(&X), None, false) {
+        return Err(());
+    }
+
+    Ok(sig)
+}
+
 pub fn encsign_2p_0(
     x0: &KeyPair,
     r0: &KeyPair,
@@ -104,6 +163,28 @@ impl From<EncryptedSignature> for RecoveryKey {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn sign_and_verify() {
+        let x0 = KeyPair::new_random();
+        let x1 = KeyPair::new_random();
+        let r0 = KeyPair::new_random();
+        let r1 = KeyPair::new_random();
+
+        let message = Message::from_slice(b"mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm").unwrap();
+
+        let partial_sig = sign_2p_0(&x0, &r0, &x1.public_key, &r1.public_key, &message);
+
+        assert!(sign_2p_1(
+            &x1,
+            &r1,
+            &x0.public_key,
+            &r0.public_key,
+            &message,
+            &partial_sig,
+        )
+        .is_ok());
+    }
 
     #[test]
     fn encsign_and_encverify() {
