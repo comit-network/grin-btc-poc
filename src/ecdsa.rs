@@ -234,7 +234,7 @@ impl From<Signature> for secp256k1zkp::Signature {
         buffer[0..32].copy_from_slice(&from.R_x[..]);
         buffer[32..64].copy_from_slice(&from.s[..]);
 
-        secp256k1zkp::Signature::from_compact(&*SECP, &buffer[..]).unwrap()
+        secp256k1zkp::Signature::from_compact(&*SECP, &buffer).unwrap()
     }
 }
 

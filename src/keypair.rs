@@ -35,6 +35,7 @@ impl KeyPair {
     pub fn new(secret_key: SecretKey) -> Self {
         let public_key = PublicKey::from_secret_key(&*SECP, &secret_key)
             .expect("could not derive public key from secret key");
+
         KeyPair {
             secret_key,
             public_key,
@@ -71,11 +72,26 @@ pub trait XCoor {
 
 impl XCoor for PublicKey {
     fn x_coor(&self) -> [u8; 32] {
-        let serialized_pk = self.serialize_vec(&*SECP, false);
+        let serialized_pk = self.serialize_vec(&*SECP, true);
 
         let mut x_coor = [0u8; 32];
-        x_coor.copy_from_slice(&serialized_pk[1..serialized_pk.len() / 2 + 1]);
+        // there's a random byte at the front of the uncompressed serialized pk
+        x_coor.copy_from_slice(&serialized_pk[1..33]);
         x_coor
+    }
+}
+
+pub trait YCoor {
+    fn y_coor(&self) -> [u8; 32];
+}
+
+impl YCoor for PublicKey {
+    fn y_coor(&self) -> [u8; 32] {
+        let serialized_pk = self.serialize_vec(&*SECP, false);
+
+        let mut y_coor = [0u8; 32];
+        y_coor.copy_from_slice(&serialized_pk[33..65]);
+        y_coor
     }
 }
 

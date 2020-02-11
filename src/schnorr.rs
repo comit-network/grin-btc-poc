@@ -1,6 +1,6 @@
 use crate::{
     grin,
-    keypair::{KeyPair, PublicKey, SecretKey, XCoor, SECP},
+    keypair::{KeyPair, Negate, PublicKey, SecretKey, XCoor, YCoor, SECP},
 };
 use secp256k1zkp::{aggsig, Message, Signature};
 
@@ -133,6 +133,23 @@ pub fn encsign_2p_1(
     Ok(encsig)
 }
 
+// TODO: Should be able to get R_hat from encsig
+pub fn decsig(y: &KeyPair, encsig: &EncryptedSignature, R_hat: &PublicKey) -> Signature {
+    // let mut R_hat_x = [0u8; 32];
+    // R_hat_x.copy_from_slice(&encsig.as_ref()[0..32]);
+    let R = PublicKey::from_combination(&*SECP, vec![&R_hat, &y.public_key]).unwrap();
+
+    let mut s_hat = [0u8; 32];
+    s_hat.copy_from_slice(&encsig.as_ref()[32..64]);
+    let mut s = SecretKey::from_slice(&*SECP, &s_hat).unwrap();
+    s.add_assign(&*SECP, &y.secret_key).unwrap();
+
+    let mut buffer = [0u8; 64];
+    buffer[0..32].copy_from_slice(&R.x_coor()[..]);
+    buffer[32..64].copy_from_slice(&s.0[..]);
+    Signature::from_raw_data(&buffer).unwrap()
+}
+
 impl From<Signature> for PartialSignature {
     fn from(from: Signature) -> PartialSignature {
         let mut s = [0u8; 32];
@@ -157,6 +174,20 @@ pub struct RecoveryKey(pub SecretKey);
 impl From<EncryptedSignature> for RecoveryKey {
     fn from(from: EncryptedSignature) -> Self {
         RecoveryKey(SecretKey::from_slice(&*SECP, &from.as_ref()[32..64]).unwrap())
+    }
+}
+
+pub fn normalize_keypairs(r0: KeyPair, r1: KeyPair, y: KeyPair) -> (KeyPair, KeyPair, KeyPair) {
+    let R =
+        PublicKey::from_combination(&*SECP, vec![&r0.public_key, &r1.public_key, &y.public_key])
+            .unwrap();
+    let mut R_y = purerust_secp256k1::curve::Field::default();
+    assert!(R_y.set_b32(&R.y_coor()));
+
+    if !R_y.is_quad_var() {
+        (r0.negate(), r1.negate(), y.negate())
+    } else {
+        (r0, r1, y)
     }
 }
 
@@ -216,5 +247,56 @@ mod test {
             &partial_encsig,
         )
         .is_ok());
+    }
+
+    #[test]
+    fn encsign_and_decsig() {
+        let x0 = KeyPair::new_random();
+        let x1 = KeyPair::new_random();
+        let r0 = KeyPair::new_random();
+        let r1 = KeyPair::new_random();
+
+        let y = KeyPair::new_random();
+
+        let (r0, r1, y) = normalize_keypairs(r0, r1, y);
+
+        let message = Message::from_slice(b"mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm").unwrap();
+
+        let partial_encsig = encsign_2p_0(
+            &x0,
+            &r0,
+            &x1.public_key,
+            &r1.public_key,
+            &y.public_key,
+            &message,
+        );
+
+        let encsig = encsign_2p_1(
+            &x1,
+            &r1,
+            &x0.public_key,
+            &r0.public_key,
+            &y.public_key,
+            &message,
+            &partial_encsig,
+        )
+        .unwrap();
+
+        let R_hat =
+            PublicKey::from_combination(&*SECP, vec![&r0.public_key, &r1.public_key]).unwrap();
+        let sig = decsig(&y, &encsig, &R_hat);
+
+        let X = PublicKey::from_combination(&*SECP, vec![&x0.public_key, &x1.public_key]).unwrap();
+
+        assert!(aggsig::verify_single(
+            &*SECP,
+            &sig,
+            &message,
+            None,
+            &X,
+            Some(&X),
+            None,
+            false
+        ));
     }
 }
