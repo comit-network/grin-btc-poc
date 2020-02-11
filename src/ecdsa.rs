@@ -6,6 +6,7 @@ use crate::{
     },
 };
 
+#[derive(Debug, PartialEq)]
 pub struct Signature {
     s: SecretKey,
     R_x: SecretKey,
@@ -168,6 +169,32 @@ pub fn encverify(
     }
 }
 
+pub fn decsig(
+    y: &KeyPair,
+    EncryptedSignature {
+        R,
+        R_hat: _,
+        s_hat,
+        proof: _,
+    }: &EncryptedSignature,
+) -> Signature {
+    let s = {
+        let mut y_inv = y.secret_key.clone();
+        y_inv.inv_assign(&*SECP).unwrap();
+
+        let mut s = s_hat.clone();
+        s.mul_assign(&*SECP, &y_inv).unwrap();
+        s
+    };
+
+    let R_x = R.x_coor();
+
+    Signature {
+        s,
+        R_x: SecretKey::from_slice(&*SECP, &R_x).unwrap(),
+    }
+}
+
 impl From<Signature> for secp256k1zkp::Signature {
     fn from(from: Signature) -> Self {
         let mut buffer = [0u8; 64];
@@ -216,5 +243,19 @@ mod test {
         let enc_signature = encsign(&x, &y.public_key, message_hash);
 
         encverify(&x.public_key, &y.public_key, message_hash, &enc_signature).unwrap();
+    }
+
+    #[test]
+    fn encsign_and_decsig() {
+        let x = KeyPair::new_random();
+        let y = KeyPair::new_random();
+
+        let message_hash = b"mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
+
+        let encsig = encsign(&x, &y.public_key, message_hash);
+
+        let sig = decsig(&y, &encsig);
+
+        assert!(verify(&x.public_key, message_hash, &sig))
     }
 }
