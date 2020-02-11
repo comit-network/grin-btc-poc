@@ -1,8 +1,8 @@
 use crate::{
     dleq,
     keypair::{
-        random_secret_key, ConvertBigInt, KeyPair, PublicKey, SecretKey, XCoor, CURVE_ORDER, G,
-        HALF_CURVE_ORDER, SECP,
+        random_secret_key, ConvertBigInt, KeyPair, Negate, PublicKey, SecretKey, XCoor,
+        CURVE_ORDER, G, HALF_CURVE_ORDER, SECP,
     },
 };
 
@@ -169,15 +169,7 @@ pub fn encverify(
     }
 }
 
-pub fn decsig(
-    y: &KeyPair,
-    EncryptedSignature {
-        R,
-        R_hat: _,
-        s_hat,
-        proof: _,
-    }: &EncryptedSignature,
-) -> Signature {
+pub fn decsig(y: &KeyPair, EncryptedSignature { R, s_hat, .. }: &EncryptedSignature) -> Signature {
     let s = {
         let mut y_inv = y.secret_key.clone();
         y_inv.inv_assign(&*SECP).unwrap();
@@ -192,6 +184,46 @@ pub fn decsig(
     Signature {
         s,
         R_x: SecretKey::from_slice(&*SECP, &R_x).unwrap(),
+    }
+}
+
+pub struct RecoveryKey {
+    Y: PublicKey,
+    s_hat: SecretKey,
+}
+
+pub fn reckey(
+    &Y: &PublicKey,
+    EncryptedSignature { s_hat, .. }: &EncryptedSignature,
+) -> RecoveryKey {
+    RecoveryKey {
+        Y,
+        s_hat: s_hat.clone(),
+    }
+}
+
+pub fn recover(
+    Signature { s, .. }: &Signature,
+    RecoveryKey { Y, s_hat }: &RecoveryKey,
+) -> Result<SecretKey, ()> {
+    let y_macron = {
+        let mut s_inv = s.clone();
+        s_inv.inv_assign(&*SECP).unwrap();
+
+        let mut y_macron = s_hat.clone();
+        y_macron.mul_assign(&*SECP, &s_inv).unwrap();
+        y_macron
+    };
+
+    let mut Gy_macron = G.clone();
+    Gy_macron.mul_assign(&*SECP, &y_macron).unwrap();
+
+    if Gy_macron == Y.clone() {
+        Ok(y_macron)
+    } else if Gy_macron == Y.negate() {
+        Ok(y_macron.negate())
+    } else {
+        Err(())
     }
 }
 
@@ -257,5 +289,21 @@ mod test {
         let sig = decsig(&y, &encsig);
 
         assert!(verify(&x.public_key, message_hash, &sig))
+    }
+
+    #[test]
+    fn recover_key_from_decrypted_signature() {
+        let x = KeyPair::new_random();
+        let y = KeyPair::new_random();
+
+        let message_hash = b"mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
+
+        let encsig = encsign(&x, &y.public_key, message_hash);
+        let sig = decsig(&y, &encsig);
+
+        let rec_key = reckey(&y.public_key, &encsig);
+        let y_tag = recover(&sig, &rec_key).unwrap();
+
+        assert_eq!(y.secret_key, y_tag);
     }
 }
