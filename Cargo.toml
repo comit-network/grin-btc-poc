@@ -12,7 +12,6 @@ lazy_static = "1.4"
 bitcoin = { version = "0.19", git = "https://github.com/jaspervdm/rust-bitcoin", branch = "zkp", features = ["bitcoinconsensus"] }
 rand = "0.7"
 serde = "1"
-rust-gmp = "0.5"
 sha2 = "0.8"
 grin_core = "3"
 hex = "0.4"

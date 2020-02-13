@@ -1,13 +1,9 @@
-use gmp::mpz::Mpz;
 use rand::Rng;
 pub use secp256k1zkp::key::{PublicKey, SecretKey};
 use secp256k1zkp::{pedersen, ContextFlag, Message, Secp256k1, Signature};
-use std::borrow::Borrow;
 
 lazy_static::lazy_static! {
     pub static ref SECP: Secp256k1 = Secp256k1::with_caps(ContextFlag::Commit);
-    pub static ref CURVE_ORDER: Mpz = Mpz::from(&secp256k1zkp::constants::CURVE_ORDER[..]);
-    pub static ref HALF_CURVE_ORDER: Mpz = CURVE_ORDER.div_floor(&Mpz::from(2));
     pub static ref G: PublicKey = {
         let mut vec = vec![4u8];
         vec.extend(&secp256k1zkp::constants::GENERATOR_G[..]);
@@ -64,10 +60,6 @@ pub fn verify_ecdsa(msg: &Message, sig: &Signature, pk: &PublicKey) -> bool {
 
 pub trait XCoor {
     fn x_coor(&self) -> [u8; 32];
-    fn x_coor_mod_q(&self) -> SecretKey {
-        let x_coor = Mpz::from(&self.x_coor()[..]).mod_floor(&*CURVE_ORDER);
-        SecretKey::from_bigint(&x_coor).unwrap()
-    }
 }
 
 impl XCoor for PublicKey {
@@ -121,22 +113,6 @@ impl Negate for KeyPair {
             secret_key: self.secret_key.negate(),
             public_key: self.public_key.negate(),
         }
-    }
-}
-
-pub trait ConvertBigInt: Sized {
-    fn to_bigint(&self) -> Mpz;
-    fn from_bigint(from: &Mpz) -> Option<Self>;
-}
-
-impl ConvertBigInt for SecretKey {
-    fn to_bigint(&self) -> Mpz {
-        Mpz::from(&self.0[..])
-    }
-
-    fn from_bigint(from: &Mpz) -> Option<Self> {
-        let vec: Vec<u8> = from.borrow().into();
-        SecretKey::from_slice(&*SECP, &vec).ok()
     }
 }
 
