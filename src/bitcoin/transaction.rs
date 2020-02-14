@@ -7,17 +7,17 @@ use secp256k1zkp::key::PublicKey;
 
 pub fn fund_transaction(
     init: &setup_parameters::Bitcoin,
-    alice_key: &PublicKey,
-    bob_key: &PublicKey,
+    redeemer_key: &PublicKey,
+    funder_key: &PublicKey,
 ) -> (Transaction, Script) {
     let fund_output_script = script::Builder::new()
         .push_int(2)
         .push_key(&::bitcoin::util::key::PublicKey {
-            key: alice_key.clone(),
+            key: redeemer_key.clone(),
             compressed: true,
         })
         .push_key(&::bitcoin::util::key::PublicKey {
-            key: bob_key.clone(),
+            key: funder_key.clone(),
             compressed: true,
         })
         .push_int(2)

@@ -145,11 +145,11 @@ pub fn funder(
         .map_err(|_| RedeemerSignatureError::Fund)?;
 
         grin::action::Fund::new(
-            &vec![(
+            vec![(
                 init.fund_input_amount(),
                 secret_init.fund_input_key.public_key,
             )],
-            &vec![(
+            vec![(
                 init.fund_output_amount(),
                 PublicKey::from_combination(&*SECP, vec![
                     &funder_SKs.x.public_key,
@@ -157,10 +157,10 @@ pub fn funder(
                 ])
                 .unwrap(),
             )],
-            &excess,
-            &excess_sig,
-            &kernel_features,
-            &secret_init.fund_input_key,
+            excess,
+            excess_sig,
+            kernel_features,
+            secret_init.fund_input_key.clone(),
         )
     };
 
@@ -194,7 +194,7 @@ pub fn funder(
         .map_err(|_| RedeemerSignatureError::Refund)?;
 
         grin::action::Refund::new(
-            &vec![(
+            vec![(
                 init.fund_output_amount(),
                 PublicKey::from_combination(&*SECP, vec![
                     &funder_SKs.x.public_key,
@@ -202,14 +202,14 @@ pub fn funder(
                 ])
                 .unwrap(),
             )],
-            &vec![(
+            vec![(
                 init.refund_output_amount(),
                 secret_init.refund_output_key.public_key,
             )],
-            &excess,
-            &excess_sig,
-            &kernel_features,
-            &secret_init.refund_output_key,
+            excess,
+            excess_sig,
+            kernel_features,
+            secret_init.refund_output_key.clone(),
         )
     };
 

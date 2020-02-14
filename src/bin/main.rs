@@ -59,7 +59,9 @@ fn main() -> Result<(), ()> {
 
     let (alice2, message4) = alice1.receive(message3)?;
 
-    dbg!("TODO: bob1 receive");
+    dbg!("bob1 receive");
+
+    let bob2 = bob1.receive(message4)?;
 
     Ok(())
 }

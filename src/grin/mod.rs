@@ -46,6 +46,7 @@ impl SKs {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PKs {
     pub X: PublicKey,
     pub R_fund: PublicKey,

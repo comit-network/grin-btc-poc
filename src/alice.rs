@@ -26,7 +26,6 @@ impl Alice0 {
         let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
 
         let commitment = Commitment::commit(&SKs_alpha.public(), &SKs_beta.public(), &y.public_key);
-        let message = Message0(commitment);
 
         let state = Alice0 {
             init,
@@ -35,6 +34,8 @@ impl Alice0 {
             SKs_beta,
             y,
         };
+
+        let message = Message0(commitment);
 
         (state, message)
     }
@@ -46,13 +47,8 @@ impl Alice0 {
             self.y.public_key,
         );
 
-        let alice_beta_refund_signature =
+        let beta_redeemer_sigs =
             bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message1.PKs_beta);
-
-        let message = Message2 {
-            opening,
-            beta_redeemer_signatures: alice_beta_refund_signature,
-        };
 
         let state = Alice1 {
             init: self.init,
@@ -62,6 +58,11 @@ impl Alice0 {
             bob_PKs_alpha: message1.PKs_alpha,
             bob_PKs_beta: message1.PKs_beta,
             y: self.y,
+        };
+
+        let message = Message2 {
+            opening,
+            beta_redeemer_sigs,
         };
 
         Ok((state, message))
@@ -80,48 +81,38 @@ pub struct Alice1 {
 
 impl Alice1 {
     pub fn receive(self, message: Message3) -> Result<(Alice2, Message4), ()> {
-        // TODO: Build bitcoin_redeem action by decrypting
-        // message.beta_encrypted_redeem_signature
-
-        let (grin_actions, redeem_encsig) = grin::sign::funder(
+        let (alpha_actions, alpha_redeem_encsig) = grin::sign::funder(
             &self.init.alpha,
             &self.secret_grin_init,
             &self.SKs_alpha,
             &self.bob_PKs_alpha,
             &self.y.public_key,
-            message.alpha_redeemer_signatures,
+            message.alpha_redeemer_sigs,
         )
         .map_err(|e| {
             println!("Grin signature verification failed: {:?}", e);
             ()
         })?;
 
-        // TODO: Move this code to bitcoin module
-        let bitcoin_redeem_transaction = bitcoin::transaction::redeem_transaction(
+        let beta_encrypted_redeem_action = bitcoin::action::EncryptedRedeem::new(
             &self.init.beta,
-            bitcoin::transaction::fund_transaction(
-                &self.init.beta,
-                &self.SKs_beta.x.public_key,
-                &self.bob_PKs_beta.X,
-            )
-            .0
-            .txid(),
+            &self.SKs_beta,
+            &self.bob_PKs_beta,
+            message.beta_redeem_encsig,
         );
+        let beta_redeem_action = beta_encrypted_redeem_action.decrypt(&self.y);
 
-        Ok((
-            Alice2 {
-                alpha_fund_action: grin_actions.fund,
-                alpha_refund_action: grin_actions.refund,
-                beta_redeem_action: bitcoin::action::Redeem {
-                    transaction: bitcoin_redeem_transaction,
-                    encrypted_signature: message.beta_encrypted_redeem_signature,
-                    signature: todo!("missing redeemer's (alice's) signature"),
-                },
-            },
-            Message4 {
-                alpha_encrypted_redeem_signature: redeem_encsig,
-            },
-        ))
+        let state = Alice2 {
+            alpha_fund_action: alpha_actions.fund,
+            alpha_refund_action: alpha_actions.refund,
+            beta_redeem_action,
+        };
+
+        let message = Message4 {
+            alpha_redeem_encsig,
+        };
+
+        Ok((state, message))
     }
 }
 
