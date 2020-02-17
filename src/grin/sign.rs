@@ -1,5 +1,5 @@
 use crate::{
-    grin::{self, PKs, SKs},
+    grin::{self, bulletproof, PKs, SKs},
     keypair::{KeyPair, Negate, PublicKey, SECP},
     schnorr, setup_parameters,
 };
@@ -10,14 +10,20 @@ pub struct GrinRedeemerSignatures {
     pub s_hat_redeem: schnorr::PartialEncryptedSignature,
 }
 
-// TODO: For fund it should return both the Schnorr partial signature and the
-// half-bulletproof
 pub fn redeemer(
     init: &setup_parameters::Grin,
     secret_init: &setup_parameters::GrinRedeemerSecret,
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
     Y: &PublicKey,
+    bulletproof::Round1 {
+        T_1: T_1_R,
+        T_2: T_2_R,
+    }: &bulletproof::Round1,
+    bulletproof::Round1 {
+        T_1: T_1_F,
+        T_2: T_2_F,
+    }: &bulletproof::Round1,
 ) -> GrinRedeemerSignatures {
     let s_fund = {
         let offset = grin::compute_offset(&funder_PKs.R_fund, &redeemer_SKs.r_fund.public_key);

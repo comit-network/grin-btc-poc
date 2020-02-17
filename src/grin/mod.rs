@@ -3,6 +3,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 
 pub mod action;
+pub mod bulletproof;
 pub mod sign;
 
 pub use crate::schnorr::EncryptedSignature;
@@ -21,21 +22,6 @@ pub struct SKs {
 }
 
 impl SKs {
-    pub fn keygen() -> SKs {
-        let x = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
-
-        let r_fund = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
-        let r_redeem = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
-        let r_refund = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
-
-        SKs {
-            x,
-            r_fund,
-            r_redeem,
-            r_refund,
-        }
-    }
-
     pub fn public(&self) -> PKs {
         PKs {
             X: self.x.public_key.clone(),
@@ -44,6 +30,26 @@ impl SKs {
             R_refund: self.r_refund.public_key.clone(),
         }
     }
+}
+
+pub fn keygen() -> (SKs, bulletproof::Round1) {
+    let x = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
+
+    let r_fund = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
+    let r_redeem = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
+    let r_refund = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
+
+    let bulletproof_round_1 = bulletproof::Round1::new(&x.secret_key);
+
+    (
+        SKs {
+            x,
+            r_fund,
+            r_redeem,
+            r_refund,
+        },
+        bulletproof_round_1,
+    )
 }
 
 #[derive(Debug, Clone)]

@@ -11,6 +11,8 @@ pub struct Bob0 {
     secret_grin_init: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
+    bulletproof_round_1_alice: grin::bulletproof::Round1,
+    bulletproof_round_1_bob: grin::bulletproof::Round1,
     alice_commitment: Commitment,
 }
 
@@ -20,7 +22,7 @@ impl Bob0 {
         secret_grin_init: setup_parameters::GrinRedeemerSecret,
         message0: Message0,
     ) -> (Bob0, Message1) {
-        let SKs_alpha = grin::SKs::keygen();
+        let (SKs_alpha, bulletproof_round_1_bob) = grin::keygen();
         let SKs_beta = bitcoin::SKs::keygen();
 
         let state = Bob0 {
@@ -28,12 +30,15 @@ impl Bob0 {
             secret_grin_init,
             SKs_alpha: SKs_alpha.clone(),
             SKs_beta: SKs_beta.clone(),
-            alice_commitment: message0.0,
+            bulletproof_round_1_alice: message0.bulletproof_round_1_alice,
+            bulletproof_round_1_bob: bulletproof_round_1_bob.clone(),
+            alice_commitment: message0.commitment,
         };
 
         let message = Message1 {
             PKs_alpha: SKs_alpha.public(),
             PKs_beta: SKs_beta.public(),
+            bulletproof_round_1_bob,
         };
 
         (state, message)
@@ -62,6 +67,8 @@ impl Bob0 {
             &self.SKs_alpha,
             &alice_PKs_alpha,
             &Y,
+            &self.bulletproof_round_1_alice,
+            &self.bulletproof_round_1_bob,
         );
 
         let state = Bob1 {

@@ -13,6 +13,7 @@ pub struct Alice0 {
     secret_grin_init: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
+    bulletproof_round_1_alice: grin::bulletproof::Round1,
     y: keypair::KeyPair,
 }
 
@@ -21,7 +22,7 @@ impl Alice0 {
         init: SetupParameters,
         secret_grin_init: setup_parameters::GrinFunderSecret,
     ) -> (Self, Message0) {
-        let SKs_alpha = grin::SKs::keygen();
+        let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen();
         let SKs_beta = bitcoin::SKs::keygen();
         let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
 
@@ -33,14 +34,18 @@ impl Alice0 {
             SKs_alpha,
             SKs_beta,
             y,
+            bulletproof_round_1_alice: bulletproof_round_1_alice.clone(),
         };
 
-        let message = Message0(commitment);
+        let message = Message0 {
+            commitment,
+            bulletproof_round_1_alice,
+        };
 
         (state, message)
     }
 
-    pub fn receive(self, message1: Message1) -> Result<(Alice1, Message2), ()> {
+    pub fn receive(self, message: Message1) -> Result<(Alice1, Message2), ()> {
         let opening = Opening::new(
             self.SKs_alpha.public(),
             self.SKs_beta.public(),
@@ -48,15 +53,17 @@ impl Alice0 {
         );
 
         let beta_redeemer_sigs =
-            bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message1.PKs_beta);
+            bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message.PKs_beta);
 
         let state = Alice1 {
             init: self.init,
             secret_grin_init: self.secret_grin_init,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
-            bob_PKs_alpha: message1.PKs_alpha,
-            bob_PKs_beta: message1.PKs_beta,
+            bob_PKs_alpha: message.PKs_alpha,
+            bob_PKs_beta: message.PKs_beta,
+            bulletproof_round_1_alice: self.bulletproof_round_1_alice,
+            bulletproof_round_1_bob: message.bulletproof_round_1_bob,
             y: self.y,
         };
 
@@ -76,6 +83,8 @@ pub struct Alice1 {
     SKs_beta: bitcoin::SKs,
     bob_PKs_alpha: grin::PKs,
     bob_PKs_beta: bitcoin::PKs,
+    bulletproof_round_1_alice: grin::bulletproof::Round1,
+    bulletproof_round_1_bob: grin::bulletproof::Round1,
     y: keypair::KeyPair,
 }
 

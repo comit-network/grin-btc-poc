@@ -5,12 +5,16 @@ use crate::{
 };
 
 // Sent by Alice
-pub struct Message0(pub Commitment);
+pub struct Message0 {
+    pub commitment: Commitment,
+    pub bulletproof_round_1_alice: grin::bulletproof::Round1,
+}
 
 // Sent by Bob
 pub struct Message1 {
     pub PKs_alpha: grin::PKs,
     pub PKs_beta: bitcoin::PKs,
+    pub bulletproof_round_1_bob: grin::bulletproof::Round1,
 }
 
 // Sent by Alice
