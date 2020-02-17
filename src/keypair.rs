@@ -129,10 +129,14 @@ pub fn build_commitment(pk: &PublicKey) -> pedersen::Commitment {
     commit.reverse();
     buffer[1..33].copy_from_slice(&commit);
 
-    // First byte equal to 0x08 or 0x09 50% of the time
-    // TODO: Determine actual value of first byte
-    buffer[0] = 0x08;
-    // buffer[0] = 0x09;
+    let mut pk_y = purerust_secp256k1::curve::Field::default();
+    assert!(pk_y.set_b32(&pk.y_coor()));
+
+    if !pk_y.is_quad_var() {
+        buffer[0] = 0x09;
+    } else {
+        buffer[0] = 0x08;
+    }
 
     pedersen::Commitment::from_vec(buffer.to_vec())
 }
@@ -140,7 +144,7 @@ pub fn build_commitment(pk: &PublicKey) -> pedersen::Commitment {
 #[cfg(test)]
 mod test {
     use super::*;
-    // Works everytime 50% of the time
+
     #[test]
     fn to_commitment_roundtrip() {
         let x = KeyPair::new_random();
@@ -151,7 +155,7 @@ mod test {
 
         assert_eq!(theirs, ours);
     }
-    // Works everytime 50% of the time
+
     #[test]
     fn to_commitment_vs_commit() {
         let x = KeyPair::new_random();
