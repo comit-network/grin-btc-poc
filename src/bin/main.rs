@@ -1,6 +1,7 @@
 use grin_btc_poc::{
     alice::Alice0,
     bob::Bob0,
+    keypair::random_secret_key,
     setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
 };
 use std::str::FromStr;
@@ -21,6 +22,8 @@ fn main() -> Result<(), ()> {
                 .public_key
                 .clone(),
             refund_output_key: grin_funder_secret_init.refund_output_key.public_key.clone(),
+            // TODO: Figure out how to generate the common nonce properly
+            bulletproof_common_nonce: random_secret_key(),
         },
         beta: Bitcoin::new(
             100_000_000,

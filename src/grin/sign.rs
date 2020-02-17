@@ -1,6 +1,6 @@
 use crate::{
     grin::{self, bulletproof, PKs, SKs},
-    keypair::{KeyPair, Negate, PublicKey, SECP},
+    keypair::{random_secret_key, KeyPair, Negate, PublicKey, SECP},
     schnorr, setup_parameters,
 };
 
@@ -16,15 +16,9 @@ pub fn redeemer(
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
     Y: &PublicKey,
-    bulletproof::Round1 {
-        T_1: T_1_R,
-        T_2: T_2_R,
-    }: &bulletproof::Round1,
-    bulletproof::Round1 {
-        T_1: T_1_F,
-        T_2: T_2_F,
-    }: &bulletproof::Round1,
-) -> GrinRedeemerSignatures {
+    bulletproof_round_1_redeemer: &bulletproof::Round1,
+    bulletproof_round_1_funder: &bulletproof::Round1,
+) -> (GrinRedeemerSignatures, bulletproof::Round2) {
     let s_fund = {
         let offset = grin::compute_offset(&funder_PKs.R_fund, &redeemer_SKs.r_fund.public_key);
         &offset;
@@ -45,6 +39,20 @@ pub fn redeemer(
             &grin::KernelFeatures::Plain { fee: init.fee }
                 .kernel_sig_msg()
                 .unwrap(),
+        )
+    };
+
+    let bulletproof_round_2_redeemer = {
+        let X_fund =
+            PublicKey::from_combination(&*SECP, vec![&redeemer_SKs.x.public_key, &funder_PKs.X])
+                .unwrap();
+        bulletproof::Round2::new(
+            &redeemer_SKs.x.secret_key,
+            &X_fund,
+            init.fund_output_amount(),
+            &init.bulletproof_common_nonce,
+            &bulletproof_round_1_redeemer,
+            &bulletproof_round_1_funder,
         )
     };
 
@@ -93,11 +101,14 @@ pub fn redeemer(
         )
     };
 
-    GrinRedeemerSignatures {
-        s_fund,
-        s_refund,
-        s_hat_redeem,
-    }
+    (
+        GrinRedeemerSignatures {
+            s_fund,
+            s_refund,
+            s_hat_redeem,
+        },
+        bulletproof_round_2_redeemer,
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +134,9 @@ pub fn funder(
         s_refund: s_refund_redeemer,
         s_hat_redeem: s_hat_redeem_redeemer,
     }: GrinRedeemerSignatures,
+    bulletproof_round_1_redeemer: &bulletproof::Round1,
+    bulletproof_round_1_funder: &bulletproof::Round1,
+    bulletproof_round_2_redeemer: &bulletproof::Round2,
 ) -> Result<(GrinFunderActions, schnorr::EncryptedSignature), RedeemerSignatureError> {
     let fund = {
         let offset = grin::compute_offset(&funder_SKs.r_fund.public_key, &redeemer_PKs.R_fund);
@@ -150,6 +164,33 @@ pub fn funder(
         )
         .map_err(|_| RedeemerSignatureError::Fund)?;
 
+        let bulletproof = {
+            let X_fund = PublicKey::from_combination(&*SECP, vec![
+                &redeemer_PKs.X,
+                &funder_SKs.x.public_key,
+            ])
+            .unwrap();
+            let bulletproof_round_2_funder = bulletproof::Round2::new(
+                &funder_SKs.x.secret_key,
+                &X_fund,
+                init.fund_output_amount(),
+                &init.bulletproof_common_nonce,
+                &bulletproof_round_1_redeemer,
+                &bulletproof_round_1_funder,
+            );
+            bulletproof::Round3::new(
+                &funder_SKs.x.secret_key,
+                &X_fund,
+                init.fund_output_amount(),
+                &init.bulletproof_common_nonce,
+                &bulletproof_round_1_redeemer,
+                &bulletproof_round_1_funder,
+                &bulletproof_round_2_redeemer,
+                &bulletproof_round_2_funder,
+            )
+            .bulletproof
+        };
+
         grin::action::Fund::new(
             vec![(
                 init.fund_input_amount(),
@@ -167,6 +208,7 @@ pub fn funder(
             excess_sig,
             kernel_features,
             secret_init.fund_input_key.clone(),
+            bulletproof,
         )
     };
 
@@ -199,6 +241,16 @@ pub fn funder(
         )
         .map_err(|_| RedeemerSignatureError::Refund)?;
 
+        // WARNING: Is the private nonce really not needed?
+        let bulletproof = SECP.bullet_proof(
+            init.redeem_output_amount(),
+            funder_SKs.x.secret_key.clone(),
+            random_secret_key(),
+            random_secret_key(),
+            None,
+            None,
+        );
+
         grin::action::Refund::new(
             vec![(
                 init.fund_output_amount(),
@@ -216,6 +268,7 @@ pub fn funder(
             excess_sig,
             kernel_features,
             secret_init.refund_output_key.clone(),
+            bulletproof,
         )
     };
 

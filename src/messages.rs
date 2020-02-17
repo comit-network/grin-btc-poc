@@ -27,6 +27,8 @@ pub struct Message2 {
 pub struct Message3 {
     pub beta_redeem_encsig: bitcoin::EncryptedSignature,
     pub alpha_redeemer_sigs: grin::GrinRedeemerSignatures,
+    // depending on whether Grin is alpha or beta this will be in Message3 or Message4
+    pub bulletproof_round_2_bob: grin::bulletproof::Round2,
 }
 
 // Sent by Alice

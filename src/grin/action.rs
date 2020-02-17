@@ -1,6 +1,6 @@
 use crate::{
     grin::{compute_excess_pk, compute_offset, PKs, SKs},
-    keypair::{build_commitment, KeyPair, PublicKey, SECP},
+    keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SECP},
     schnorr, setup_parameters,
 };
 use grin_core::core::{Input, KernelFeatures, Output, OutputFeatures, Transaction, TxKernel};
@@ -19,6 +19,7 @@ impl Fund {
         excess_sig: Signature,
         kernel_features: KernelFeatures,
         special_input_x: KeyPair,
+        bulletproof: RangeProof,
     ) -> Self {
         Self {
             transaction_to_special_output: new_transaction(
@@ -27,6 +28,7 @@ impl Fund {
                 excess,
                 excess_sig,
                 kernel_features,
+                bulletproof,
             ),
             special_output_x: special_input_x.clone(),
         }
@@ -46,6 +48,7 @@ impl Refund {
         excess_sig: Signature,
         kernel_features: KernelFeatures,
         special_output_x: KeyPair,
+        bulletproof: RangeProof,
     ) -> Self {
         Self {
             transaction_to_special_output: new_transaction(
@@ -54,6 +57,7 @@ impl Refund {
                 excess,
                 excess_sig,
                 kernel_features,
+                bulletproof,
             ),
             special_output_x: special_output_x.clone(),
         }
@@ -130,8 +134,24 @@ impl EncryptedRedeem {
             )
             .unwrap();
 
+            let bulletproof = SECP.bullet_proof(
+                init.redeem_output_amount(),
+                redeemer_SKs.x.secret_key,
+                random_secret_key(),
+                random_secret_key(),
+                None,
+                None,
+            );
+
             Box::new(move |excess_sig| {
-                new_transaction(inputs, outputs, excess, excess_sig, kernel_features)
+                new_transaction(
+                    inputs,
+                    outputs,
+                    excess,
+                    excess_sig,
+                    kernel_features,
+                    bulletproof,
+                )
             })
         };
 
@@ -167,6 +187,7 @@ fn new_transaction(
     excess: PublicKey,
     excess_sig: Signature,
     kernel_features: KernelFeatures,
+    proof: RangeProof,
 ) -> Transaction {
     let inputs = inputs
         .iter()
@@ -195,8 +216,6 @@ fn new_transaction(
                 &PublicKey::from_combination(&*SECP, vec![&amount_pk, &blind_pk]).unwrap(),
             );
 
-            // TODO: Use a valid rangeproof
-            let proof = RangeProof::zero();
             Output {
                 features: OutputFeatures::Plain,
                 commit,
@@ -207,6 +226,8 @@ fn new_transaction(
 
     let kernel = {
         TxKernel {
+            // NOTE: Do we need to add a commitment to zero to the excess commitment for no
+            // apparent reason???
             excess: build_commitment(&excess),
             excess_sig: excess_sig.clone(),
             features: kernel_features.clone(),

@@ -97,6 +97,9 @@ impl Alice1 {
             &self.bob_PKs_alpha,
             &self.y.public_key,
             message.alpha_redeemer_sigs,
+            &self.bulletproof_round_1_bob,
+            &self.bulletproof_round_1_alice,
+            &message.bulletproof_round_2_bob,
         )
         .map_err(|e| {
             println!("Grin signature verification failed: {:?}", e);

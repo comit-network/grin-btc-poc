@@ -1,6 +1,6 @@
 use crate::{
     bitcoin::OutPoint,
-    keypair::{KeyPair, PublicKey},
+    keypair::{KeyPair, PublicKey, SecretKey},
 };
 
 #[derive(Debug, Clone)]
@@ -17,6 +17,7 @@ pub struct Grin {
     pub fund_input_key: PublicKey,
     pub redeem_output_key: PublicKey,
     pub refund_output_key: PublicKey,
+    pub bulletproof_common_nonce: SecretKey,
 }
 
 impl Grin {

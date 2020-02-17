@@ -61,14 +61,16 @@ impl Bob0 {
             &alice_beta_refund_signature,
         )?;
 
+        // TODO: handle the fact that grin signing produces both signatures and
+        // "partial" bulletproofs
         let alpha_redeemer_sigs = grin::sign::redeemer(
             &self.init.alpha,
             &self.secret_grin_init,
             &self.SKs_alpha,
             &alice_PKs_alpha,
             &Y,
-            &self.bulletproof_round_1_alice,
             &self.bulletproof_round_1_bob,
+            &self.bulletproof_round_1_alice,
         );
 
         let state = Bob1 {
@@ -85,7 +87,8 @@ impl Bob0 {
 
         let message = Message3 {
             beta_redeem_encsig,
-            alpha_redeemer_sigs,
+            alpha_redeemer_sigs: alpha_redeemer_sigs.0,
+            bulletproof_round_2_bob: alpha_redeemer_sigs.1,
         };
 
         Ok((state, message))
