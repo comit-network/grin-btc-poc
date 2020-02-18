@@ -1,5 +1,4 @@
 use crate::keypair::{KeyPair, PublicKey};
-use rand::Rng;
 
 pub mod action;
 pub mod sign;
@@ -18,7 +17,7 @@ pub struct SKs {
 
 impl SKs {
     pub fn keygen() -> SKs {
-        let x = KeyPair::from_slice(&rand::thread_rng().gen::<[u8; 32]>());
+        let x = KeyPair::new_random();
 
         SKs { x }
     }

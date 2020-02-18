@@ -41,13 +41,16 @@ impl Opening {
         }
     }
 
-    pub fn open(self, commitment: Commitment) -> Result<(grin::PKs, bitcoin::PKs, PublicKey), ()> {
+    pub fn open(
+        self,
+        commitment: Commitment,
+    ) -> anyhow::Result<(grin::PKs, bitcoin::PKs, PublicKey)> {
         let self_commitment = Commitment::commit(&self.PKs_grin, &self.PKs_bitcoin, &self.Y);
 
         if &commitment.0[..] == &self_commitment.0[..] {
             Ok((self.PKs_grin, self.PKs_bitcoin, self.Y))
         } else {
-            Err(())
+            Err(anyhow::anyhow!("Opening does not match commitment"))
         }
     }
 }

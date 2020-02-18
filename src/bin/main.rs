@@ -1,12 +1,13 @@
 use grin_btc_poc::{
     alice::Alice0,
     bob::Bob0,
+    grin::{self, action::Execute},
     keypair::random_secret_key,
     setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
 };
 use std::str::FromStr;
 
-fn main() -> Result<(), ()> {
+fn main() -> anyhow::Result<()> {
     let grin_funder_secret_init = GrinFunderSecret::new_random();
     let grin_redeemer_secret_init = GrinRedeemerSecret::new_random();
 
@@ -46,25 +47,25 @@ fn main() -> Result<(), ()> {
         .expect("cannot fail"),
     };
 
-    let (alice0, message0) = Alice0::new(init.clone(), grin_funder_secret_init);
+    let (alice0, message0) = Alice0::new(init.clone(), grin_funder_secret_init)?;
 
-    let (bob0, message1) = Bob0::new(init, grin_redeemer_secret_init, message0);
+    let (bob0, message1) = Bob0::new(init, grin_redeemer_secret_init, message0)?;
 
-    dbg!("alice0 receive");
-
-    let (alice1, message2) = alice0.receive(message1).expect("message1");
-
-    dbg!("bob0 receive");
+    let (alice1, message2) = alice0.receive(message1);
 
     let (bob1, message3) = bob0.receive(message2)?;
 
-    dbg!("alice1 receive");
-
     let (alice2, message4) = alice1.receive(message3)?;
-
-    dbg!("bob1 receive");
 
     let bob2 = bob1.receive(message4)?;
 
+    // Set up wallets
+    let grin_wallets = grin::Wallets::initialize()?;
+    let alice_wallet = &grin_wallets.0[0];
+
+    // Alice funds Grin
+    alice2.alpha_fund_action.execute(&alice_wallet)?;
+
+    grin::Wallets::clean_up();
     Ok(())
 }

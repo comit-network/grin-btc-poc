@@ -6,8 +6,6 @@ use crate::{
     setup_parameters::{self, SetupParameters},
 };
 
-// TODO: Figure out what to do with bulletproof keys, if anything. For now,
-// ignore them since we don't know how we are gonna tackle them
 pub struct Alice0 {
     init: SetupParameters,
     secret_grin_init: setup_parameters::GrinFunderSecret,
@@ -21,8 +19,8 @@ impl Alice0 {
     pub fn new(
         init: SetupParameters,
         secret_grin_init: setup_parameters::GrinFunderSecret,
-    ) -> (Self, Message0) {
-        let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen();
+    ) -> anyhow::Result<(Self, Message0)> {
+        let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen()?;
         let SKs_beta = bitcoin::SKs::keygen();
         let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
 
@@ -42,10 +40,10 @@ impl Alice0 {
             bulletproof_round_1_alice,
         };
 
-        (state, message)
+        Ok((state, message))
     }
 
-    pub fn receive(self, message: Message1) -> Result<(Alice1, Message2), ()> {
+    pub fn receive(self, message: Message1) -> (Alice1, Message2) {
         let opening = Opening::new(
             self.SKs_alpha.public(),
             self.SKs_beta.public(),
@@ -72,7 +70,7 @@ impl Alice0 {
             beta_redeemer_sigs,
         };
 
-        Ok((state, message))
+        (state, message)
     }
 }
 
@@ -89,7 +87,7 @@ pub struct Alice1 {
 }
 
 impl Alice1 {
-    pub fn receive(self, message: Message3) -> Result<(Alice2, Message4), ()> {
+    pub fn receive(self, message: Message3) -> anyhow::Result<(Alice2, Message4)> {
         let (alpha_actions, alpha_redeem_encsig) = grin::sign::funder(
             &self.init.alpha,
             &self.secret_grin_init,
@@ -101,10 +99,11 @@ impl Alice1 {
             &self.bulletproof_round_1_alice,
             &message.bulletproof_round_2_bob,
         )
-        .map_err(|e| {
-            println!("Grin signature verification failed: {:?}", e);
-            ()
-        })?;
+        // .map_err(|e| {
+        //     println!("Grin signature verification failed: {:?}", e);
+        //     ()
+        // })
+            ?;
 
         let beta_encrypted_redeem_action = bitcoin::action::EncryptedRedeem::new(
             &self.init.beta,
@@ -129,7 +128,7 @@ impl Alice1 {
 }
 
 pub struct Alice2 {
-    alpha_fund_action: grin::action::Fund,
-    alpha_refund_action: grin::action::Refund,
-    beta_redeem_action: bitcoin::action::Redeem,
+    pub alpha_fund_action: grin::action::Fund,
+    pub alpha_refund_action: grin::action::Refund,
+    pub beta_redeem_action: bitcoin::action::Redeem,
 }

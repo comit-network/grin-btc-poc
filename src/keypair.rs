@@ -1,5 +1,5 @@
 use rand::Rng;
-pub use secp256k1zkp::key::{PublicKey, SecretKey};
+pub use secp256k1zkp::key::{PublicKey, SecretKey, ZERO_KEY};
 use secp256k1zkp::{pedersen, ContextFlag, Message, Secp256k1, Signature};
 
 lazy_static::lazy_static! {

@@ -42,7 +42,7 @@ pub fn funder(
     redeemer_PKs: &bitcoin::PKs,
     Y: &PublicKey,
     redeemer_refund_signature: &secp256k1zkp::Signature,
-) -> Result<(BitcoinFunderActions, ecdsa::EncryptedSignature), ()> {
+) -> anyhow::Result<(BitcoinFunderActions, ecdsa::EncryptedSignature)> {
     let (fund_transaction, fund_output_script) =
         bitcoin::transaction::fund_transaction(&init, &redeemer_PKs.X, &funder_SKs.x.public_key);
 
@@ -64,7 +64,9 @@ pub fn funder(
             .expect("Should not fail because it is a hash");
 
         if !keypair::verify_ecdsa(&refund_digest, &redeemer_refund_signature, &redeemer_PKs.X) {
-            return Err(());
+            return Err(anyhow::anyhow!(
+                "failed to verify redeemer's Bitcoin refund signature"
+            ));
         }
 
         let funder_refund_signature = funder_SKs.x.sign_ecdsa(&refund_digest);

@@ -21,8 +21,8 @@ impl Bob0 {
         init: SetupParameters,
         secret_grin_init: setup_parameters::GrinRedeemerSecret,
         message0: Message0,
-    ) -> (Bob0, Message1) {
-        let (SKs_alpha, bulletproof_round_1_bob) = grin::keygen();
+    ) -> anyhow::Result<(Bob0, Message1)> {
+        let (SKs_alpha, bulletproof_round_1_bob) = grin::keygen()?;
         let SKs_beta = bitcoin::SKs::keygen();
 
         let state = Bob0 {
@@ -41,7 +41,7 @@ impl Bob0 {
             bulletproof_round_1_bob,
         };
 
-        (state, message)
+        Ok((state, message))
     }
 
     pub fn receive(
@@ -50,7 +50,7 @@ impl Bob0 {
             opening,
             beta_redeemer_sigs: alice_beta_refund_signature,
         }: Message2,
-    ) -> Result<(Bob1, Message3), ()> {
+    ) -> anyhow::Result<(Bob1, Message3)> {
         let (alice_PKs_alpha, alice_PKs_beta, Y) = opening.open(self.alice_commitment)?;
 
         let (beta_actions, beta_redeem_encsig) = bitcoin::sign::funder(
@@ -71,7 +71,7 @@ impl Bob0 {
             &Y,
             &self.bulletproof_round_1_bob,
             &self.bulletproof_round_1_alice,
-        );
+        )?;
 
         let state = Bob1 {
             init: self.init,
@@ -108,7 +108,7 @@ pub struct Bob1 {
 }
 
 impl Bob1 {
-    pub fn receive(self, message: Message4) -> Result<Bob2, ()> {
+    pub fn receive(self, message: Message4) -> anyhow::Result<Bob2> {
         let alpha_encrypted_redeem_action = grin::action::EncryptedRedeem::new(
             self.init.alpha,
             self.secret_grin_init,
