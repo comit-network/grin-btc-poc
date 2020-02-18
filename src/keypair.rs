@@ -1,6 +1,7 @@
 use rand::Rng;
 pub use secp256k1zkp::key::{PublicKey, SecretKey};
 use secp256k1zkp::{pedersen, ContextFlag, Message, Secp256k1, Signature};
+use crate::bitcoin::{BitcoinPublicKey,Address, Network};
 
 lazy_static::lazy_static! {
     pub static ref SECP: Secp256k1 = Secp256k1::with_caps(ContextFlag::Commit);
@@ -51,6 +52,10 @@ impl KeyPair {
 
     pub fn sign_ecdsa(&self, message: &Message) -> Signature {
         SECP.sign(message, &self.secret_key).expect("cannot fail")
+    }
+
+    pub fn to_bitcoin_address(&self) -> Address {
+        Address::p2wpkh(&BitcoinPublicKey { key: self.public_key, compressed: true }, Network::Regtest)
     }
 }
 

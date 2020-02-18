@@ -10,12 +10,14 @@ grin_secp256k1zkp = "0.7"
 generic-array = "0.12"
 lazy_static = "1.4"
 bitcoin = { version = "0.19", git = "https://github.com/jaspervdm/rust-bitcoin", branch = "zkp", features = ["bitcoinconsensus"] }
+bitcoin_hashes = "0.7"
 rand = "0.7"
 serde = "1"
 sha2 = "0.8"
 grin_core = "3"
 hex = "0.4"
 purerust_secp256k1 = { package = "libsecp256k1", version = "0.3" }
+ureq = { version = "0.11", features = ["json"]}
 
 [patch.crates-io]
 grin_secp256k1zkp = { git = "https://github.com/jaspervdm/rust-secp256k1-zkp", branch = "master" }

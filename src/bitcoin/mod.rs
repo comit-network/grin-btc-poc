@@ -4,10 +4,11 @@ use rand::Rng;
 pub mod action;
 pub mod sign;
 pub mod transaction;
+pub mod util;
 
 pub use crate::ecdsa::EncryptedSignature;
 pub use ::bitcoin::{
-    hashes::Hash, util::bip143::SighashComponents, Address, OutPoint, Transaction,
+    hashes::Hash, util::bip143::SighashComponents, Address, OutPoint, Transaction, network::constants::Network, util::key::PublicKey as BitcoinPublicKey, SigHashType
 };
 pub use secp256k1zkp::Signature;
 

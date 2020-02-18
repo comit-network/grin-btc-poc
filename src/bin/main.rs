@@ -1,12 +1,19 @@
 use grin_btc_poc::{
     alice::Alice0,
     bob::Bob0,
-    keypair::random_secret_key,
+    keypair::{KeyPair,random_secret_key},
     setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
+    bitcoin::util::{send_rawtransaction, new_owned_output},
 };
 use std::str::FromStr;
 
 fn main() -> Result<(), ()> {
+    let bob_input = new_owned_output(3).expect("funding bob initial input");
+    dbg!(&bob_input);
+    let bob_change = KeyPair::new_random();
+    let alice_redeem_keypair = KeyPair::new_random();
+    let bob_refund_keypair = KeyPair::new_random();
+
     let grin_funder_secret_init = GrinFunderSecret::new_random();
     let grin_redeemer_secret_init = GrinRedeemerSecret::new_random();
 
@@ -29,19 +36,10 @@ fn main() -> Result<(), ()> {
             100_000_000,
             1_000,
             0,
-            vec![(bitcoin::OutPoint::null(), 300_000_000)],
-            bitcoin::Address::from_str(
-                "bcrt1qc45uezve8vj8nds7ws0da8vfkpanqfxecem3xl7wcs3cdne0358q9zx9qg",
-            )
-            .unwrap(),
-            bitcoin::Address::from_str(
-                "bcrt1qs2aderg3whgu0m8uadn6dwxjf7j3wx97kk2qqtrum89pmfcxknhsf89pj0",
-            )
-            .unwrap(),
-            bitcoin::Address::from_str(
-                "bcrt1qc45uezve8vj8nds7ws0da8vfkpanqfxecem3xl7wcs3cdne0358q9zx9qg",
-            )
-            .unwrap(),
+            vec![(bob_input.outpoint , bob_input.txout.value)],
+            bob_change.to_bitcoin_address(),
+            bob_refund_keypair.to_bitcoin_address(),
+            alice_redeem_keypair.to_bitcoin_address(),
         )
         .expect("cannot fail"),
     };
@@ -66,5 +64,8 @@ fn main() -> Result<(), ()> {
 
     let bob2 = bob1.receive(message4)?;
 
+    let funding_tx = &bob2.beta_fund_action.sign_inputs(vec![bob_input]).expect("funding tx signing");
+
+    send_rawtransaction(&funding_tx).expect("funding tx broadcast");
     Ok(())
 }

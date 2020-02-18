@@ -127,7 +127,7 @@ impl Bob1 {
 }
 
 pub struct Bob2 {
-    beta_fund_action: bitcoin::action::Fund,
-    beta_refund_action: bitcoin::action::Refund,
-    alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
+    pub beta_fund_action: bitcoin::action::Fund,
+    pub beta_refund_action: bitcoin::action::Refund,
+    pub alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
 }

@@ -48,7 +48,6 @@ pub fn funder(
 
     let fund = bitcoin::action::Fund {
         transaction: fund_transaction.clone(),
-        inputs: init.inputs.iter().map(|(i, _)| i.clone()).collect(),
     };
 
     let refund = {

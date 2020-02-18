@@ -1,17 +1,64 @@
 use crate::{
     bitcoin::{
+        util::OwnedOutput,
         transaction::{fund_transaction, redeem_transaction},
-        Hash, OutPoint, PKs, SKs, SighashComponents, Signature, Transaction,
+        Hash, OutPoint, PKs, SKs, SighashComponents, Signature, Transaction, SigHashType,
     },
     ecdsa,
-    keypair::KeyPair,
+    keypair::{SECP,KeyPair, PublicKey},
     setup_parameters,
 };
 use secp256k1zkp::Message;
+use bitcoin::{Script, hashes::hash160};
 
 pub struct Fund {
     pub transaction: Transaction,
-    pub inputs: Vec<OutPoint>,
+}
+
+fn generate_prev_script_p2wpkh(public_key: &PublicKey) -> Script {
+    let public_key_hash =  hash160::Hash::hash(public_key.serialize_vec(&*SECP, true).to_vec().as_ref());
+
+    let mut prev_script = vec![0x76, 0xa9, 0x14];
+
+    prev_script.append(&mut public_key_hash[..].to_vec());
+    prev_script.push(0x88);
+    prev_script.push(0xac);
+
+    Script::from(prev_script)
+}
+
+impl Fund {
+    pub fn sign_inputs(&self, owned_outputs: Vec<OwnedOutput>) -> Result<Transaction, ()> {
+        let mut completed_tx = self.transaction.clone();
+        let sighash_components = SighashComponents::new(&completed_tx);
+        for ref mut input in &mut completed_tx.input {
+            let owned_output = match owned_outputs.iter().find(|candidate| candidate.outpoint == input.previous_output) {
+                Some(matched) => matched,
+                None => return Err(())
+            };
+
+            let fund_digest = {
+                let digest = sighash_components.sighash_all(
+                    &input,
+                    &generate_prev_script_p2wpkh(&owned_output.keypair.public_key),
+                    owned_output.txout.value,
+                );
+
+                Message::from_slice(&digest.into_inner()).expect("always correct length")
+            };
+
+            let signature_element = {
+                let signature = owned_output.keypair.sign_ecdsa(&fund_digest);
+                let mut serialized_signature = signature.serialize_der(&*SECP).to_vec();
+                serialized_signature.push(SigHashType::All as u8);
+                serialized_signature
+            };
+
+            input.witness = vec![signature_element, owned_output.keypair.public_key.serialize_vec(&*SECP, true).to_vec()]
+        }
+
+        Ok(completed_tx)
+    }
 }
 
 pub struct Refund {
