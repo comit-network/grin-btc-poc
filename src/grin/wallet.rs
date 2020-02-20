@@ -1,15 +1,12 @@
 use crate::keypair::{random_secret_key, SECP};
 use grin_chain::Chain;
-use grin_core::core::{
-    verifier_cache::{LruVerifierCache, VerifierCache},
-    Output, OutputFeatures, Transaction,
-};
-use grin_util::{RwLock, ZeroingString};
+use grin_core::core::{Input, Output, OutputFeatures, Transaction};
+use grin_util::ZeroingString;
 use grin_wallet_impls::{
-    test_framework::{award_blocks_to_wallet, LocalWalletClient, WalletProxy},
+    test_framework::{award_blocks_to_wallet, wallet_info, LocalWalletClient, WalletProxy},
     DefaultLCProvider, DefaultWalletImpl,
 };
-use grin_wallet_libwallet::{InitTxArgs, NodeClient, Slate, WalletInst};
+use grin_wallet_libwallet::{InitTxArgs, IssueInvoiceTxArgs, NodeClient, Slate, WalletInst};
 use grin_wallet_util::{grin_keychain::ExtKeychain, grin_util::Mutex};
 use secp256k1zkp::SecretKey;
 use std::{sync::Arc, thread};
@@ -56,10 +53,6 @@ impl Wallets {
                 .open_wallet(None, ZeroingString::from(""), false, false)
                 .map_err(|e| anyhow::anyhow!("failed to open Grin wallet: {}", e))?;
 
-            // let mask_ref = match mask {
-            //     Some(ref mask) => Some(mask),
-            //     _ => None,
-            // };
             let wallet = Arc::new(Mutex::new(wallet));
             wallet_proxy.add_wallet(
                 &id,
@@ -76,8 +69,6 @@ impl Wallets {
                 mask,
                 chain,
             };
-
-            wallet.award_60_grin()?;
 
             wallets.push(wallet)
         }
@@ -125,7 +116,7 @@ impl Wallet {
     }
 
     pub fn process_invoice(&self, slate: Slate) -> anyhow::Result<Slate> {
-        let mut processed_slate = slate.clone();
+        let mut processed_slate = Slate::blank(2);
         grin_wallet_controller::controller::owner_single_use(
             self.inner.clone(),
             self.mask.as_ref(),
@@ -160,7 +151,7 @@ impl Wallet {
     }
 
     // 1 block reward (60 grin) is spendable after 4 blocks have been mined
-    fn award_60_grin(&self) -> anyhow::Result<()> {
+    pub fn award_60_grin(&self) -> anyhow::Result<()> {
         award_blocks_to_wallet(
             self.chain.as_ref(),
             self.inner.clone(),
@@ -170,6 +161,55 @@ impl Wallet {
         )
         .map_err(|e| anyhow::anyhow!("could not award grin to wallet: {}", e))
     }
+
+    pub fn issue_invoice(&self, amount: u64) -> anyhow::Result<Slate> {
+        let mut invoice_slate = Slate::blank(2);
+        grin_wallet_controller::controller::owner_single_use(
+            self.inner.clone(),
+            self.mask.as_ref(),
+            |api, m| {
+                let args = IssueInvoiceTxArgs {
+                    amount,
+                    ..Default::default()
+                };
+                invoice_slate = api.issue_invoice_tx(m, args)?;
+                Ok(())
+            },
+        )
+        .map(|_| invoice_slate)
+        .map_err(|e| anyhow::anyhow!("could not issue invoice: {}", e))
+    }
+
+    pub fn finalize_invoice(&self, slate: Slate) -> anyhow::Result<Transaction> {
+        let mut finalized_slate = Slate::blank(2);
+        grin_wallet_controller::controller::foreign_single_use(
+            self.inner.clone(),
+            self.mask.clone(),
+            |api| {
+                finalized_slate = api.finalize_invoice_tx(&slate)?;
+                Ok(())
+            },
+        )
+        .map(|_| finalized_slate.tx)
+        .map_err(|e| anyhow::anyhow!("could not finalize invoice: {}", e))
+    }
+
+    pub fn get_balance(&self) -> anyhow::Result<u64> {
+        wallet_info(self.inner.clone(), self.mask.as_ref())
+            .map(|info| info.amount_currently_spendable)
+            .map_err(|e| anyhow::anyhow!("failed to access wallet balance: {}", e))
+    }
+}
+
+pub fn build_input(amount: u64, secret_key: &SecretKey) -> anyhow::Result<Input> {
+    let commit = SECP
+        .commit(amount, secret_key.clone())
+        .map_err(|e| anyhow::anyhow!("failed to build Pedersen commitment: {}", e))?;
+
+    Ok(Input {
+        features: OutputFeatures::Plain,
+        commit,
+    })
 }
 
 pub fn build_output(amount: u64, secret_key: &SecretKey) -> anyhow::Result<Output> {
@@ -178,16 +218,16 @@ pub fn build_output(amount: u64, secret_key: &SecretKey) -> anyhow::Result<Outpu
         .map_err(|e| anyhow::anyhow!("failed to build Pedersen commitment: {}", e))?;
 
     // These are just used for random number generation inside bullet proof C
-    // function?
     let rewind_nonce = random_secret_key();
     let private_nonce = random_secret_key();
+
     let proof = SECP.bullet_proof(
         amount,
         secret_key.clone(),
         rewind_nonce,
         private_nonce,
         None,
-        None, // this is used by the wallet to look for inputs (we're not a wallet)
+        None,
     );
 
     Ok(Output {
@@ -195,8 +235,4 @@ pub fn build_output(amount: u64, secret_key: &SecretKey) -> anyhow::Result<Outpu
         commit,
         proof,
     })
-}
-
-pub fn verifier_cache() -> Arc<RwLock<dyn VerifierCache>> {
-    Arc::new(RwLock::new(LruVerifierCache::new()))
 }

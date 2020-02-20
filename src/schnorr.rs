@@ -177,23 +177,6 @@ impl TryFrom<EncryptedSignature> for RecoveryKey {
     }
 }
 
-pub fn normalize_keypairs(
-    r0: KeyPair,
-    r1: KeyPair,
-    y: KeyPair,
-) -> anyhow::Result<(KeyPair, KeyPair, KeyPair)> {
-    let R =
-        PublicKey::from_combination(&*SECP, vec![&r0.public_key, &r1.public_key, &y.public_key])?;
-    let mut R_y = purerust_secp256k1::curve::Field::default();
-    assert!(R_y.set_b32(&R.y_coor()));
-
-    if !R_y.is_quad_var() {
-        Ok((r0.negate(), r1.negate(), y.negate()))
-    } else {
-        Ok((r0, r1, y))
-    }
-}
-
 impl TryFrom<Signature> for PartialSignature {
     type Error = anyhow::Error;
     fn try_from(from: Signature) -> anyhow::Result<PartialSignature> {
@@ -209,6 +192,7 @@ impl PartialSignature {
         let mut sig = [0u8; 64];
         sig[0..32].copy_from_slice(&R.x_coor()[..]);
         sig[32..64].copy_from_slice(&(self.0).0[..]);
+
         Ok(Signature::from_raw_data(&sig)?)
     }
 }
@@ -221,6 +205,23 @@ pub enum Error {
     CalculatePartialSig,
     #[error("failed to verify sig")]
     VerifySig,
+}
+
+pub fn normalize_keypairs(
+    r0: KeyPair,
+    r1: KeyPair,
+    y: KeyPair,
+) -> anyhow::Result<(KeyPair, KeyPair, KeyPair)> {
+    let R =
+        PublicKey::from_combination(&*SECP, vec![&r0.public_key, &r1.public_key, &y.public_key])?;
+    let mut R_y = purerust_secp256k1::curve::Field::default();
+    assert!(R_y.set_b32(&R.y_coor()));
+
+    if !R_y.is_quad_var() {
+        Ok((r0.negate(), r1.negate(), y.negate()))
+    } else {
+        Ok((r0, r1, y))
+    }
 }
 
 #[cfg(test)]

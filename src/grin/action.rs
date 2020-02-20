@@ -1,7 +1,7 @@
 use crate::{
     grin::{
         compute_excess_pk, compute_excess_sk, compute_offset,
-        wallet::{build_output, Wallet},
+        wallet::{build_input, build_output, Wallet},
         PKs, SKs,
     },
     keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
@@ -16,7 +16,7 @@ use std::convert::TryInto;
 
 pub struct Fund {
     transaction_from_special_input: Transaction,
-    special_input_x: (u64, KeyPair),
+    special_input: (u64, KeyPair, u64),
 }
 
 impl Fund {
@@ -27,7 +27,7 @@ impl Fund {
         excess_sig: Signature,
         kernel_features: KernelFeatures,
         offset: SecretKey,
-        special_input_x: (u64, KeyPair),
+        special_input: (u64, KeyPair, u64),
     ) -> anyhow::Result<Self> {
         Ok(Self {
             transaction_from_special_input: new_transaction(
@@ -39,14 +39,14 @@ impl Fund {
                 offset,
             )
             .context("fund")?,
-            special_input_x,
+            special_input,
         })
     }
 }
 
 pub struct Refund {
     transaction_to_special_output: Transaction,
-    special_output_x: KeyPair,
+    special_output: KeyPair,
 }
 
 impl Refund {
@@ -57,7 +57,7 @@ impl Refund {
         excess_sig: Signature,
         kernel_features: KernelFeatures,
         offset: SecretKey,
-        special_output_x: KeyPair,
+        special_output: KeyPair,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             transaction_to_special_output: new_transaction(
@@ -69,7 +69,7 @@ impl Refund {
                 offset,
             )
             .context("refund")?,
-            special_output_x: special_output_x.clone(),
+            special_output: special_output.clone(),
         })
     }
 }
@@ -77,7 +77,7 @@ impl Refund {
 pub struct EncryptedRedeem {
     incomplete_transaction_to_special_output:
         Box<dyn FnOnce(Signature) -> anyhow::Result<Transaction>>,
-    special_output_x: KeyPair,
+    special_output: (u64, KeyPair, u64),
     encsig: schnorr::EncryptedSignature,
     R_hat: PublicKey,
 }
@@ -93,7 +93,7 @@ impl EncryptedRedeem {
     ) -> anyhow::Result<Self> {
         let offset = compute_offset(&funder_PKs.R_redeem, &redeemer_SKs.r_redeem.public_key)?;
 
-        let X = compute_excess_pk(
+        let excess_pk = compute_excess_pk(
             vec![&redeemer_SKs.x.public_key, &funder_PKs.X],
             vec![&init.redeem_output_key],
             Some(&offset),
@@ -105,15 +105,15 @@ impl EncryptedRedeem {
         ])?;
         let R = PublicKey::from_combination(&*SECP, vec![&R_hat, &Y])?;
 
-        let kernel_features = KernelFeatures::Plain { fee: init.fee };
+        let kernel_features = KernelFeatures::Plain { fee: 0 };
 
         if !aggsig::verify_single(
             &*SECP,
             &encsig,
             &kernel_features.kernel_sig_msg()?,
             Some(&R),
-            &X,
-            Some(&X),
+            &excess_pk,
+            Some(&excess_pk),
             None,
             true,
         ) {
@@ -132,8 +132,8 @@ impl EncryptedRedeem {
             )];
 
             let bulletproof = SECP.bullet_proof(
-                init.redeem_output_amount(),
-                redeemer_SKs.x.secret_key,
+                init.fund_output_amount(),
+                secret_init.redeem_output_key.secret_key.clone(),
                 random_secret_key(),
                 random_secret_key(),
                 None,
@@ -141,26 +141,46 @@ impl EncryptedRedeem {
             );
 
             let outputs = vec![(
-                init.redeem_output_amount(),
+                init.fund_output_amount(),
                 secret_init.redeem_output_key.public_key,
                 bulletproof,
             )];
 
-            let offset = compute_offset(&redeemer_SKs.r_redeem.public_key, &funder_PKs.R_redeem)?;
-            let excess = compute_excess_pk(
-                vec![&redeemer_SKs.x.public_key, &funder_PKs.X],
-                vec![&secret_init.redeem_output_key.public_key],
-                Some(&offset),
-            )?;
-
             Box::new(move |excess_sig| {
-                new_transaction(inputs, outputs, excess, excess_sig, kernel_features, offset)
+                // TODO: normalize_keypairs or something similar to deal with 50/50
+                if !aggsig::verify_single(
+                    &*SECP,
+                    &excess_sig,
+                    &kernel_features.kernel_sig_msg()?,
+                    Some(&R),
+                    &excess_pk,
+                    Some(&excess_pk),
+                    None,
+                    false,
+                ) {
+                    return Err(anyhow::anyhow!(
+                        "failed to verify Grin decrypted redeem signature"
+                    ));
+                }
+
+                new_transaction(
+                    inputs,
+                    outputs,
+                    excess_pk,
+                    excess_sig,
+                    kernel_features,
+                    offset,
+                )
             })
         };
 
         Ok(Self {
             incomplete_transaction_to_special_output,
-            special_output_x: secret_init.redeem_output_key,
+            special_output: (
+                init.fund_output_amount(),
+                secret_init.redeem_output_key,
+                init.fee,
+            ),
             encsig,
             R_hat,
         })
@@ -174,20 +194,20 @@ impl EncryptedRedeem {
 
         Ok(Redeem {
             transaction_to_special_output,
-            special_output_x: self.special_output_x,
+            special_output: self.special_output,
         })
     }
 }
 
 pub struct Redeem {
     transaction_to_special_output: Transaction,
-    special_output_x: KeyPair,
+    special_output: (u64, KeyPair, u64),
 }
 
 fn new_transaction(
     inputs: Vec<(u64, PublicKey)>,
     outputs: Vec<(u64, PublicKey, RangeProof)>,
-    excess: PublicKey,
+    excess_pk: PublicKey,
     excess_sig: Signature,
     kernel_features: KernelFeatures,
     offset: SecretKey,
@@ -221,7 +241,7 @@ fn new_transaction(
         })
         .collect::<Result<Vec<Output>, anyhow::Error>>()?;
 
-    let excess = build_commitment(&excess);
+    let excess = build_commitment(&excess_pk);
 
     let kernel = {
         TxKernel {
@@ -247,20 +267,20 @@ impl Execute for Fund {
         let (slate, r, blind_excess_keypair) = {
             let mut slate = Slate::blank(2);
 
-            slate.amount = self.special_input_x.0;
+            slate.amount = self.special_input.0;
             slate.height = wallet.get_chain_tip()?;
 
             slate.version_info.block_header_version = 3;
             slate.lock_height = 0;
 
-            let special_output = build_output(slate.amount, &self.special_input_x.1.secret_key)?;
+            let special_output = build_output(slate.amount, &self.special_input.1.secret_key)?;
             slate.tx = slate.tx.with_output(special_output);
 
             let r = KeyPair::new_random();
 
             // Using zero offset for "internal" transaction
             let blind_excess =
-                compute_excess_sk(vec![], vec![&self.special_input_x.1.secret_key], None)?;
+                compute_excess_sk(vec![], vec![&self.special_input.1.secret_key], None)?;
             let blind_excess_keypair = KeyPair::new(blind_excess);
 
             slate.participant_data = vec![ParticipantData {
@@ -312,6 +332,64 @@ impl Execute for Fund {
         let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
             transaction_from_funder_wallet_to_special_output.clone(),
             self.transaction_from_special_input.clone(),
+        ])
+        .map_err(|e| anyhow::anyhow!("failed to aggregate fund transaction: {}", e))?;
+
+        wallet.post_transaction(aggregate_transaction)
+    }
+}
+
+impl Execute for Redeem {
+    fn execute(self, wallet: &Wallet) -> anyhow::Result<()> {
+        let mut slate = wallet.issue_invoice(self.special_output.0 - self.special_output.2)?;
+
+        slate.fee = self.special_output.2;
+        slate.update_kernel();
+
+        let special_input = build_input(self.special_output.0, &self.special_output.1.secret_key)?;
+        slate.tx = slate.tx.with_input(special_input);
+
+        let r = KeyPair::new_random();
+
+        let blind_excess =
+            compute_excess_sk(vec![&self.special_output.1.secret_key], vec![], None)?;
+        let blind_excess_keypair = KeyPair::new(blind_excess);
+
+        slate.participant_data.push(ParticipantData {
+            id: 0,
+            public_blind_excess: blind_excess_keypair.public_key,
+            public_nonce: r.public_key,
+            part_sig: None,
+            message: None,
+            message_sig: None,
+        });
+
+        let receiver_data = slate
+            .participant_data
+            .iter()
+            .find(|p| p.id == 1)
+            .ok_or(anyhow::anyhow!("missing sender data"))?;
+
+        let partial_sig = schnorr::sign_2p_0(
+            &blind_excess_keypair,
+            &r,
+            &receiver_data.public_blind_excess,
+            &receiver_data.public_nonce,
+            &KernelFeatures::Plain { fee: slate.fee }.kernel_sig_msg()?,
+        )?;
+
+        for p in slate.participant_data.iter_mut() {
+            if p.id == 0 {
+                p.part_sig = Some(partial_sig.to_signature(&r.public_key)?);
+            }
+        }
+
+        let transaction_from_special_input_to_redeemer_wallet =
+            wallet.finalize_invoice(slate).unwrap();
+
+        let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
+            self.transaction_to_special_output.clone(),
+            transaction_from_special_input_to_redeemer_wallet.clone(),
         ])
         .map_err(|e| anyhow::anyhow!("failed to aggregate fund transaction: {}", e))?;
 

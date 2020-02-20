@@ -1,4 +1,4 @@
-use crate::keypair::{KeyPair, Negate, PublicKey, SecretKey, XCoor, G, SECP};
+use crate::keypair::{KeyPair, Negate, PublicKey, SecretKey, XCoor, YCoor, G, SECP};
 use secp256k1zkp::key::ZERO_KEY;
 use sha2::{Digest, Sha256};
 
@@ -157,4 +157,44 @@ pub fn compute_offset(funder_R: &PublicKey, redeemer_R: &PublicKey) -> anyhow::R
     hasher.input(&redeemer_R.x_coor());
 
     Ok(SecretKey::from_slice(&*SECP, &hasher.result())?)
+}
+
+pub fn normalize_redeem_keys_alice(
+    r0: &mut KeyPair,
+    R1: &mut PublicKey,
+    y: &mut KeyPair,
+) -> anyhow::Result<()> {
+    let R = PublicKey::from_combination(&*SECP, vec![&r0.public_key, &R1, &y.public_key])?;
+    let mut R_y = purerust_secp256k1::curve::Field::default();
+    assert!(R_y.set_b32(&R.y_coor()));
+
+    if !R_y.is_quad_var() {
+        *r0 = r0.negate();
+        *R1 = R1.negate();
+        *y = y.negate();
+
+        Ok(())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn normalize_redeem_keys_bob(
+    R0: &mut PublicKey,
+    r1: &mut KeyPair,
+    Y: &mut PublicKey,
+) -> anyhow::Result<()> {
+    let R = PublicKey::from_combination(&*SECP, vec![&R0, &r1.public_key, &Y])?;
+    let mut R_y = purerust_secp256k1::curve::Field::default();
+    assert!(R_y.set_b32(&R.y_coor()));
+
+    if !R_y.is_quad_var() {
+        *R0 = R0.negate();
+        *r1 = r1.negate();
+        *Y = Y.negate();
+
+        Ok(())
+    } else {
+        Ok(())
+    }
 }

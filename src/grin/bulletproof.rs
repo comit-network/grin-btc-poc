@@ -179,12 +179,13 @@ mod test {
         ])?;
 
         let mut x_bob_prime = x_bob.secret_key;
-        x_bob_prime.add_assign(&*SECP, &x_input.secret_key.negate());
+        x_bob_prime.add_assign(&*SECP, &x_input.secret_key.negate())?;
 
         let round1_alice = Round1::new(&x_alice.secret_key)?;
         let round1_bob = Round1::new(&x_bob_prime)?;
 
         let round2_alice = Round2::new(
+            &x_alice.secret_key,
             &x_alice.secret_key,
             &X,
             value,
@@ -195,6 +196,7 @@ mod test {
 
         let round2_bob = Round2::new(
             &x_bob_prime,
+            &x_bob_prime,
             &X,
             value,
             &common_nonce,
@@ -203,6 +205,7 @@ mod test {
         )?;
 
         assert!(Round3::new(
+            &x_alice.secret_key,
             &x_alice.secret_key,
             &X,
             value,

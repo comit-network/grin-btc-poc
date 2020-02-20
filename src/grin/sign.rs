@@ -40,12 +40,12 @@ pub fn redeemer(
                 &redeemer_SKs.r_fund,
                 &half_excess_pk_funder,
                 &funder_PKs.R_fund,
-                &KernelFeatures::Plain { fee: init.fee }.kernel_sig_msg()?,
+                &KernelFeatures::Plain { fee: 0 }.kernel_sig_msg()?,
             )?
         };
 
         let bulletproof_round_2_redeemer = {
-            let X = PublicKey::from_combination(&*SECP, vec![
+            let excess_pk = PublicKey::from_combination(&*SECP, vec![
                 &redeemer_SKs.x.public_key,
                 &funder_PKs.X,
             ])?;
@@ -53,7 +53,7 @@ pub fn redeemer(
             bulletproof::Round2::new(
                 &redeemer_SKs.x.secret_key,
                 &redeemer_SKs.x.secret_key,
-                &X,
+                &excess_pk,
                 init.fund_output_amount(),
                 &init.bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
@@ -82,7 +82,7 @@ pub fn redeemer(
             &half_excess_pk_funder,
             &funder_PKs.R_refund,
             &KernelFeatures::HeightLocked {
-                fee: init.fee,
+                fee: 0,
                 lock_height: init.expiry,
             }
             .kernel_sig_msg()?,
@@ -106,7 +106,7 @@ pub fn redeemer(
             &half_excess_pk_funder,
             &funder_PKs.R_redeem,
             &Y,
-            &KernelFeatures::Plain { fee: init.fee }.kernel_sig_msg()?,
+            &KernelFeatures::Plain { fee: 0 }.kernel_sig_msg()?,
         )?
     };
 
@@ -164,9 +164,9 @@ pub fn funder(
         let half_excess_pk_redeemer =
             compute_excess_pk(vec![], vec![&redeemer_PKs.X], Some(&offset))?;
 
-        let kernel_features = KernelFeatures::Plain { fee: init.fee };
+        let kernel_features = KernelFeatures::Plain { fee: 0 };
 
-        let (excess_sig, excess) = schnorr::sign_2p_1(
+        let (excess_sig, excess_pk) = schnorr::sign_2p_1(
             &half_excess_keypair_funder,
             &funder_SKs.r_fund,
             &half_excess_pk_redeemer,
@@ -202,15 +202,19 @@ pub fn funder(
 
         action::Fund::new(
             vec![(
-                init.fund_input_amount(),
+                init.fund_output_amount(),
                 secret_init.fund_input_key.public_key,
             )],
             vec![(init.fund_output_amount(), X, bulletproof)],
-            excess,
+            excess_pk,
             excess_sig,
             kernel_features,
             offset,
-            (init.fund_input_amount(), secret_init.fund_input_key.clone()),
+            (
+                init.fund_output_amount(),
+                secret_init.fund_input_key.clone(),
+                init.fee,
+            ),
         )?
     };
 
@@ -227,7 +231,7 @@ pub fn funder(
             compute_excess_pk(vec![&redeemer_PKs.X], vec![], Some(&offset))?;
 
         let kernel_features = KernelFeatures::HeightLocked {
-            fee: init.fee,
+            fee: 0,
             lock_height: init.expiry,
         };
 
@@ -286,7 +290,7 @@ pub fn funder(
             &half_excess_pk_redeemer,
             &redeemer_PKs.R_redeem,
             &Y,
-            &KernelFeatures::Plain { fee: init.fee }.kernel_sig_msg()?,
+            &KernelFeatures::Plain { fee: 0 }.kernel_sig_msg()?,
             &s_hat_redeem_redeemer,
         )
         .map_err(|_| RedeemerSignatureError::Redeem)?

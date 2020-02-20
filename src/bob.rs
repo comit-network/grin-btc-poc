@@ -45,13 +45,19 @@ impl Bob0 {
     }
 
     pub fn receive(
-        self,
+        mut self,
         Message2 {
             opening,
             beta_redeemer_sigs: alice_beta_refund_signature,
         }: Message2,
     ) -> anyhow::Result<(Bob1, Message3)> {
-        let (alice_PKs_alpha, alice_PKs_beta, Y) = opening.open(self.alice_commitment)?;
+        let (mut alice_PKs_alpha, alice_PKs_beta, mut Y) = opening.open(self.alice_commitment)?;
+
+        grin::normalize_redeem_keys_bob(
+            &mut alice_PKs_alpha.R_redeem,
+            &mut self.SKs_alpha.r_redeem,
+            &mut Y,
+        )?;
 
         let (beta_actions, beta_redeem_encsig) = bitcoin::sign::funder(
             &self.init.beta,
@@ -127,7 +133,7 @@ impl Bob1 {
 }
 
 pub struct Bob2 {
-    beta_fund_action: bitcoin::action::Fund,
-    beta_refund_action: bitcoin::action::Refund,
-    alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
+    pub beta_fund_action: bitcoin::action::Fund,
+    pub beta_refund_action: bitcoin::action::Refund,
+    pub alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
 }

@@ -22,7 +22,7 @@ impl Alice0 {
     ) -> anyhow::Result<(Self, Message0)> {
         let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen()?;
         let SKs_beta = bitcoin::SKs::keygen();
-        let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
+        let y = keypair::KeyPair::new_random();
 
         let commitment = Commitment::commit(&SKs_alpha.public(), &SKs_beta.public(), &y.public_key);
 
@@ -43,12 +43,18 @@ impl Alice0 {
         Ok((state, message))
     }
 
-    pub fn receive(self, message: Message1) -> (Alice1, Message2) {
+    pub fn receive(mut self, mut message: Message1) -> anyhow::Result<(Alice1, Message2)> {
         let opening = Opening::new(
             self.SKs_alpha.public(),
             self.SKs_beta.public(),
             self.y.public_key,
         );
+
+        grin::normalize_redeem_keys_alice(
+            &mut self.SKs_alpha.r_redeem,
+            &mut message.PKs_alpha.R_redeem,
+            &mut self.y,
+        )?;
 
         let beta_redeemer_sigs =
             bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message.PKs_beta);
@@ -70,7 +76,7 @@ impl Alice0 {
             beta_redeemer_sigs,
         };
 
-        (state, message)
+        Ok((state, message))
     }
 }
 
@@ -83,7 +89,8 @@ pub struct Alice1 {
     bob_PKs_beta: bitcoin::PKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
     bulletproof_round_1_bob: grin::bulletproof::Round1,
-    y: keypair::KeyPair,
+    // TODO: Remove pub after testing once y is extracted from the other chain
+    pub y: keypair::KeyPair,
 }
 
 impl Alice1 {
@@ -98,12 +105,7 @@ impl Alice1 {
             &self.bulletproof_round_1_bob,
             &self.bulletproof_round_1_alice,
             &message.bulletproof_round_2_bob,
-        )
-        // .map_err(|e| {
-        //     println!("Grin signature verification failed: {:?}", e);
-        //     ()
-        // })
-            ?;
+        )?;
 
         let beta_encrypted_redeem_action = bitcoin::action::EncryptedRedeem::new(
             &self.init.beta,
