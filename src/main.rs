@@ -5,8 +5,9 @@ use grin_btc_poc::{
     grin::{self, action::Execute},
     keypair::random_secret_key,
     setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
+    LookFor,
 };
-use std::str::FromStr;
+use std::{convert::TryInto, str::FromStr};
 
 fn main() -> anyhow::Result<()> {
     let grin_funder_secret_init = GrinFunderSecret::new_random();
@@ -59,6 +60,9 @@ fn main() -> anyhow::Result<()> {
 
     let bob2 = bob1.receive(message4)?;
 
+    // TODO: Consider moving wallets into Alice and Bob so that we can keep the code
+    // in main.rs at a higher level
+
     // Set up wallets
     let grin_wallets = grin::Wallets::initialize()?;
 
@@ -70,17 +74,27 @@ fn main() -> anyhow::Result<()> {
     // Alice funds Grin
     alice2.alpha_fund_action.execute(&alice_grin_wallet)?;
 
-    let grin_starting_balance = bob_grin_wallet.get_balance()?;
+    let grin_starting_balance_bob = bob_grin_wallet.get_balance()?;
 
     // Bob redeems Grin (ignoring Bitcoin in the meantime)
-    let alpha_redeem_action = bob2.alpha_encrypted_redeem_action.decrypt(&y).unwrap();
+    let grin_encsig = bob2.alpha_encrypted_redeem_action.encsig.clone();
+
+    let alpha_redeem_action = bob2.alpha_encrypted_redeem_action.decrypt(&y)?;
     alpha_redeem_action.execute(&bob_grin_wallet)?;
 
     // Verify that bob gets the agreed upon grin
     assert_eq!(
         bob_grin_wallet.get_balance()?,
-        grin_starting_balance + init.alpha.asset
+        grin_starting_balance_bob + init.alpha.asset
     );
+
+    // TODO: Remove all this. Just testing that you can extract the signature from
+    // Bob's redeem transaction
+    let grin_decrypted_redeem_sig = bob_grin_wallet.look_for(bob2.beta_redeem_event)?;
+    let y_tag =
+        grin_btc_poc::schnorr::recover(&grin_decrypted_redeem_sig, &grin_encsig.try_into()?)?;
+
+    assert_eq!(y_tag, y.secret_key);
 
     grin::Wallets::clean_up();
     Ok(())

@@ -1,6 +1,10 @@
-use crate::keypair::{random_secret_key, SECP};
+use crate::{
+    grin::{event, Signature},
+    keypair::{random_secret_key, SECP},
+    look_for::LookFor,
+};
 use grin_chain::Chain;
-use grin_core::core::{Input, Output, OutputFeatures, Transaction};
+use grin_core::core::{Input, Output, OutputFeatures, Transaction, TxKernel};
 use grin_util::ZeroingString;
 use grin_wallet_impls::{
     test_framework::{award_blocks_to_wallet, wallet_info, LocalWalletClient, WalletProxy},
@@ -8,7 +12,7 @@ use grin_wallet_impls::{
 };
 use grin_wallet_libwallet::{InitTxArgs, IssueInvoiceTxArgs, NodeClient, Slate, WalletInst};
 use grin_wallet_util::{grin_keychain::ExtKeychain, grin_util::Mutex};
-use secp256k1zkp::SecretKey;
+use secp256k1zkp::{pedersen::Commitment, SecretKey};
 use std::{sync::Arc, thread};
 
 lazy_static::lazy_static! {
@@ -198,6 +202,25 @@ impl Wallet {
         wallet_info(self.inner.clone(), self.mask.as_ref())
             .map(|info| info.amount_currently_spendable)
             .map_err(|e| anyhow::anyhow!("failed to access wallet balance: {}", e))
+    }
+
+    pub fn find_kernel(&self, excess: &Commitment) -> anyhow::Result<TxKernel> {
+        self.chain
+            .get_kernel_height(&excess, None, None)
+            .map_err(|e| anyhow::anyhow!("failed to search for kernel: {}", e))?
+            .map(|(kernel, ..)| kernel)
+            .ok_or_else(|| anyhow::anyhow!("could not find kernel for commitment: {:?}", excess))
+    }
+}
+
+impl LookFor for Wallet {
+    type Event = event::Redeem;
+    type Extract = Signature;
+
+    fn look_for(&self, event: Self::Event) -> anyhow::Result<Self::Extract> {
+        let kernel = self.find_kernel(&event.excess)?;
+
+        Ok(kernel.excess_sig)
     }
 }
 

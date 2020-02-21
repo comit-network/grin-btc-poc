@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 
 pub mod action;
 pub mod bulletproof;
+pub mod event;
 pub mod sign;
 pub mod wallet;
 
@@ -15,6 +16,7 @@ pub use grin_core::{
     core::KernelFeatures,
     libtx::aggsig::{add_signatures, calculate_partial_sig, verify_partial_sig},
 };
+pub use secp256k1zkp::Signature;
 pub use sign::GrinRedeemerSignatures;
 
 #[derive(Debug, Clone)]

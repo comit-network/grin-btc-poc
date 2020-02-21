@@ -8,6 +8,9 @@ pub mod dleq;
 pub mod ecdsa;
 pub mod grin;
 pub mod keypair;
+pub mod look_for;
 pub mod messages;
 pub mod schnorr;
 pub mod setup_parameters;
+
+pub use look_for::LookFor;

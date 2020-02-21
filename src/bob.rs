@@ -115,6 +115,10 @@ pub struct Bob1 {
 
 impl Bob1 {
     pub fn receive(self, message: Message4) -> anyhow::Result<Bob2> {
+        // TODO: Change to bitcoin::event::Redeem once Bitcoin actions are executed too
+        let beta_redeem_event =
+            grin::event::Redeem::new(&self.init.alpha, &self.SKs_alpha, &self.alice_PKs_alpha)?;
+
         let alpha_encrypted_redeem_action = grin::action::EncryptedRedeem::new(
             self.init.alpha,
             self.secret_grin_init,
@@ -128,6 +132,7 @@ impl Bob1 {
             beta_fund_action: self.beta_fund_action,
             beta_refund_action: self.beta_refund_action,
             alpha_encrypted_redeem_action,
+            beta_redeem_event,
         })
     }
 }
@@ -136,4 +141,6 @@ pub struct Bob2 {
     pub beta_fund_action: bitcoin::action::Fund,
     pub beta_refund_action: bitcoin::action::Refund,
     pub alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
+    // TODO: Change to bitcoin::event::Redeem once Bitcoin actions are executed too
+    pub beta_redeem_event: grin::event::Redeem,
 }

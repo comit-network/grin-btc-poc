@@ -171,7 +171,7 @@ pub fn funder(
             &funder_SKs.r_fund,
             &half_excess_pk_redeemer,
             &redeemer_PKs.R_fund,
-            &kernel_features.kernel_sig_msg().unwrap(),
+            &kernel_features.kernel_sig_msg()?,
             &s_fund_redeemer,
         )
         .map_err(|_| RedeemerSignatureError::Fund)?;

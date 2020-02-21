@@ -78,7 +78,8 @@ pub struct EncryptedRedeem {
     incomplete_transaction_to_special_output:
         Box<dyn FnOnce(Signature) -> anyhow::Result<Transaction>>,
     special_output: (u64, KeyPair, u64),
-    encsig: schnorr::EncryptedSignature,
+    // TODO: Should be private. It's only public for testing.
+    pub encsig: schnorr::EncryptedSignature,
     R_hat: PublicKey,
 }
 
@@ -384,8 +385,7 @@ impl Execute for Redeem {
             }
         }
 
-        let transaction_from_special_input_to_redeemer_wallet =
-            wallet.finalize_invoice(slate).unwrap();
+        let transaction_from_special_input_to_redeemer_wallet = wallet.finalize_invoice(slate)?;
 
         let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
             self.transaction_to_special_output.clone(),
