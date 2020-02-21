@@ -19,12 +19,9 @@ fn main() -> anyhow::Result<()> {
             asset: 10_000_000_000,
             fee: 5_000_000,
             expiry: 0,
-            fund_input_key: grin_funder_secret_init.fund_input_key.public_key.clone(),
-            redeem_output_key: grin_redeemer_secret_init
-                .redeem_output_key
-                .public_key
-                .clone(),
-            refund_output_key: grin_funder_secret_init.refund_output_key.public_key.clone(),
+            fund_input_key: grin_funder_secret_init.fund_input_key.public_key,
+            redeem_output_key: grin_redeemer_secret_init.redeem_output_key.public_key,
+            refund_output_key: grin_funder_secret_init.refund_output_key.public_key,
             // TODO: Figure out how to generate the common nonce properly
             bulletproof_common_nonce: random_secret_key(),
         },
