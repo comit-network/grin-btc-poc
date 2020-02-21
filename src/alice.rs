@@ -8,7 +8,7 @@ use crate::{
 
 pub struct Alice0 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinFunderSecret,
+    secret_init_grin: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
@@ -18,7 +18,7 @@ pub struct Alice0 {
 impl Alice0 {
     pub fn new(
         init: SetupParameters,
-        secret_grin_init: setup_parameters::GrinFunderSecret,
+        secret_init_grin: setup_parameters::GrinFunderSecret,
     ) -> anyhow::Result<(Self, Message0)> {
         let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen()?;
         let SKs_beta = bitcoin::SKs::keygen();
@@ -28,7 +28,7 @@ impl Alice0 {
 
         let state = Alice0 {
             init,
-            secret_grin_init,
+            secret_init_grin,
             SKs_alpha,
             SKs_beta,
             y,
@@ -61,7 +61,7 @@ impl Alice0 {
 
         let state = Alice1 {
             init: self.init,
-            secret_grin_init: self.secret_grin_init,
+            secret_init_grin: self.secret_init_grin,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
             bob_PKs_alpha: message.PKs_alpha,
@@ -82,7 +82,7 @@ impl Alice0 {
 
 pub struct Alice1 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinFunderSecret,
+    secret_init_grin: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bob_PKs_alpha: grin::PKs,
@@ -97,7 +97,7 @@ impl Alice1 {
     pub fn receive(self, message: Message3) -> anyhow::Result<(Alice2, Message4)> {
         let (alpha_actions, alpha_redeem_encsig) = grin::sign::funder(
             &self.init.alpha,
-            &self.secret_grin_init,
+            &self.secret_init_grin,
             &self.SKs_alpha,
             &self.bob_PKs_alpha,
             &self.y.public_key,

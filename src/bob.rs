@@ -8,7 +8,7 @@ use crate::{
 
 pub struct Bob0 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinRedeemerSecret,
+    secret_init_grin: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
@@ -19,7 +19,7 @@ pub struct Bob0 {
 impl Bob0 {
     pub fn new(
         init: SetupParameters,
-        secret_grin_init: setup_parameters::GrinRedeemerSecret,
+        secret_init_grin: setup_parameters::GrinRedeemerSecret,
         message0: Message0,
     ) -> anyhow::Result<(Bob0, Message1)> {
         let (SKs_alpha, bulletproof_round_1_bob) = grin::keygen()?;
@@ -27,7 +27,7 @@ impl Bob0 {
 
         let state = Bob0 {
             init,
-            secret_grin_init,
+            secret_init_grin,
             SKs_alpha: SKs_alpha.clone(),
             SKs_beta: SKs_beta.clone(),
             bulletproof_round_1_alice: message0.bulletproof_round_1_alice,
@@ -71,7 +71,7 @@ impl Bob0 {
         // "partial" bulletproofs
         let alpha_redeemer_sigs = grin::sign::redeemer(
             &self.init.alpha,
-            &self.secret_grin_init,
+            &self.secret_init_grin,
             &self.SKs_alpha,
             &alice_PKs_alpha,
             &Y,
@@ -81,7 +81,7 @@ impl Bob0 {
 
         let state = Bob1 {
             init: self.init,
-            secret_grin_init: self.secret_grin_init,
+            secret_init_grin: self.secret_init_grin,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
             alice_PKs_alpha,
@@ -103,7 +103,7 @@ impl Bob0 {
 
 pub struct Bob1 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinRedeemerSecret,
+    secret_init_grin: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     alice_PKs_alpha: grin::PKs,
@@ -121,7 +121,7 @@ impl Bob1 {
 
         let alpha_encrypted_redeem_action = grin::action::EncryptedRedeem::new(
             self.init.alpha,
-            self.secret_grin_init,
+            self.secret_init_grin,
             self.SKs_alpha,
             self.alice_PKs_alpha,
             self.Y,
