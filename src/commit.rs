@@ -47,7 +47,7 @@ impl Opening {
     ) -> anyhow::Result<(grin::PKs, bitcoin::PKs, PublicKey)> {
         let self_commitment = Commitment::commit(&self.PKs_grin, &self.PKs_bitcoin, &self.Y);
 
-        if &commitment.0[..] == &self_commitment.0[..] {
+        if commitment.0[..] == self_commitment.0[..] {
             Ok((self.PKs_grin, self.PKs_bitcoin, self.Y))
         } else {
             Err(anyhow::anyhow!("Opening does not match commitment"))

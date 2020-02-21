@@ -24,7 +24,7 @@ impl SKs {
 
     pub fn public(&self) -> PKs {
         PKs {
-            X: self.x.public_key.clone(),
+            X: self.x.public_key,
         }
     }
 }

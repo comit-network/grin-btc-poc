@@ -64,7 +64,7 @@ pub fn sign_2p_1(
     };
 
     if !aggsig::verify_single(&*SECP, &sig, message, None, &X, Some(&X), None, false) {
-        return Err(Error::VerifySig)?;
+        return Err(Error::VerifySig.into());
     }
 
     Ok((sig, X))
@@ -128,7 +128,7 @@ pub fn encsign_2p_1(
     };
 
     if !aggsig::verify_single(&*SECP, &encsig, message, Some(&R), &X, Some(&X), None, true) {
-        return Err(Error::VerifySig)?;
+        return Err(Error::VerifySig.into());
     }
 
     Ok(encsig)
@@ -159,7 +159,7 @@ pub fn recover(sig: &Signature, recovery_key: &RecoveryKey) -> anyhow::Result<Se
     let s = SecretKey::from_slice(&*SECP, &sig.as_ref()[32..64])?;
     let s_hat = &recovery_key.0;
 
-    let mut y = s.clone();
+    let mut y = s;
     y.add_assign(&*SECP, &s_hat.negate())?;
     Ok(y)
 }

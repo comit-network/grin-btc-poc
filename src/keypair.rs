@@ -93,7 +93,7 @@ pub trait Negate {
 
 impl Negate for PublicKey {
     fn negate(&self) -> Self {
-        let mut negated = self.clone();
+        let mut negated = *self;
         negated.mul_assign(&*SECP, &*MINUS_ONE).unwrap();
         negated
     }

@@ -48,7 +48,7 @@ pub fn funder(
 
     let fund = bitcoin::action::Fund {
         transaction: fund_transaction.clone(),
-        inputs: init.inputs.iter().map(|(i, _)| i.clone()).collect(),
+        inputs: init.inputs.iter().map(|(i, _)| *i).collect(),
     };
 
     let refund = {
@@ -73,7 +73,7 @@ pub fn funder(
 
         bitcoin::action::Refund::new(
             refund_transaction,
-            redeemer_refund_signature.clone(),
+            *redeemer_refund_signature,
             funder_refund_signature,
         )
     };

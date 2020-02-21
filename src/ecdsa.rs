@@ -3,7 +3,7 @@ use crate::{
     keypair::{random_secret_key, KeyPair, Negate, PublicKey, SecretKey, XCoor, G, SECP},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Signature {
     s: SecretKey,
     R_x: SecretKey,
@@ -18,10 +18,10 @@ pub struct EncryptedSignature {
 
 pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSignature {
     let r = random_secret_key();
-    let mut R_hat = G.clone();
+    let mut R_hat = *G;
     R_hat.mul_assign(&*SECP, &r).unwrap();
 
-    let mut R = Y.clone();
+    let mut R = *Y;
     R.mul_assign(&*SECP, &r).unwrap();
 
     let proof = dleq::prove(&G, &R_hat, &Y, &R, &r);
@@ -29,7 +29,7 @@ pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSign
     let s_hat = {
         let R_x = SecretKey::from_slice(&*SECP, &R.x_coor()).unwrap();
 
-        let mut s_hat = R_x.clone();
+        let mut s_hat = R_x;
         s_hat.mul_assign(&*SECP, &x.secret_key).unwrap();
         s_hat
             .add_assign(
@@ -38,7 +38,7 @@ pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSign
             )
             .unwrap();
 
-        let mut r_inv = r.clone();
+        let mut r_inv = r;
         r_inv.inv_assign(&*SECP).unwrap();
 
         s_hat.mul_assign(&*SECP, &r_inv).unwrap();
@@ -85,15 +85,15 @@ pub fn encverify(
     let U0 = {
         let mut u0 = message_hash;
         u0.mul_assign(&*SECP, &s_hat_inv).unwrap();
-        let mut U0 = G.clone();
+        let mut U0 = *G;
         U0.mul_assign(&*SECP, &u0).unwrap();
         U0
     };
 
     let U1 = {
-        let mut u1 = R_x.clone();
+        let mut u1 = R_x;
         u1.mul_assign(&*SECP, &s_hat_inv).unwrap();
-        let mut U1 = X.clone();
+        let mut U1 = *X;
         U1.mul_assign(&*SECP, &u1).unwrap();
         U1
     };
@@ -153,10 +153,10 @@ pub fn recover(
         y_macron
     };
 
-    let mut Gy_macron = G.clone();
+    let mut Gy_macron = *G;
     Gy_macron.mul_assign(&*SECP, &y_macron).unwrap();
 
-    if Gy_macron == Y.clone() {
+    if Gy_macron == *Y {
         Ok(y_macron)
     } else if Gy_macron == Y.negate() {
         Ok(y_macron.negate())

@@ -69,7 +69,7 @@ impl Refund {
                 offset,
             )
             .context("refund")?,
-            special_output: special_output.clone(),
+            special_output,
         })
     }
 }
@@ -237,7 +237,7 @@ fn new_transaction(
             Ok(Output {
                 features: OutputFeatures::Plain,
                 commit,
-                proof: proof.clone(),
+                proof: *proof,
             })
         })
         .collect::<Result<Vec<Output>, anyhow::Error>>()?;
@@ -247,8 +247,8 @@ fn new_transaction(
     let kernel = {
         TxKernel {
             excess,
-            excess_sig: excess_sig.clone(),
-            features: kernel_features.clone(),
+            excess_sig,
+            features: kernel_features,
         }
     };
 
@@ -304,7 +304,7 @@ impl Execute for Fund {
                 .participant_data
                 .iter()
                 .find(|p| p.id == 0)
-                .ok_or(anyhow::anyhow!("missing sender data"))?;
+                .ok_or_else(|| anyhow::anyhow!("missing sender data"))?;
 
             let (sig, excess) = crate::schnorr::sign_2p_1(
                 &blind_excess_keypair,
@@ -314,7 +314,7 @@ impl Execute for Fund {
                 &KernelFeatures::Plain { fee: slate.fee }.kernel_sig_msg()?,
                 &sender_data
                     .part_sig
-                    .ok_or(anyhow::anyhow!("missing sender partsig"))?
+                    .ok_or_else(|| anyhow::anyhow!("missing sender partsig"))?
                     .try_into()?,
             )?;
 
@@ -331,8 +331,8 @@ impl Execute for Fund {
         };
 
         let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
-            transaction_from_funder_wallet_to_special_output.clone(),
-            self.transaction_from_special_input.clone(),
+            transaction_from_funder_wallet_to_special_output,
+            self.transaction_from_special_input,
         ])
         .map_err(|e| anyhow::anyhow!("failed to aggregate fund transaction: {}", e))?;
 
@@ -369,7 +369,7 @@ impl Execute for Redeem {
             .participant_data
             .iter()
             .find(|p| p.id == 1)
-            .ok_or(anyhow::anyhow!("missing sender data"))?;
+            .ok_or_else(|| anyhow::anyhow!("missing sender data"))?;
 
         let partial_sig = schnorr::sign_2p_0(
             &blind_excess_keypair,
@@ -388,8 +388,8 @@ impl Execute for Redeem {
         let transaction_from_special_input_to_redeemer_wallet = wallet.finalize_invoice(slate)?;
 
         let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
-            self.transaction_to_special_output.clone(),
-            transaction_from_special_input_to_redeemer_wallet.clone(),
+            self.transaction_to_special_output,
+            transaction_from_special_input_to_redeemer_wallet,
         ])
         .map_err(|e| anyhow::anyhow!("failed to aggregate fund transaction: {}", e))?;
 

@@ -74,7 +74,7 @@ fn main() -> anyhow::Result<()> {
     let grin_starting_balance_bob = bob_grin_wallet.get_balance()?;
 
     // Bob redeems Grin (ignoring Bitcoin in the meantime)
-    let grin_encsig = bob2.alpha_encrypted_redeem_action.encsig.clone();
+    let grin_encsig = bob2.alpha_encrypted_redeem_action.encsig;
 
     let alpha_redeem_action = bob2.alpha_encrypted_redeem_action.decrypt(&y)?;
     alpha_redeem_action.execute(&bob_grin_wallet)?;

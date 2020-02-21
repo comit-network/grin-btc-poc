@@ -30,10 +30,10 @@ pub struct SKs {
 impl SKs {
     pub fn public(&self) -> PKs {
         PKs {
-            X: self.x.public_key.clone(),
-            R_fund: self.r_fund.public_key.clone(),
-            R_redeem: self.r_redeem.public_key.clone(),
-            R_refund: self.r_refund.public_key.clone(),
+            X: self.x.public_key,
+            R_fund: self.r_fund.public_key,
+            R_redeem: self.r_redeem.public_key,
+            R_refund: self.r_refund.public_key,
         }
     }
 }
@@ -141,7 +141,7 @@ pub fn compute_excess_pk(
     };
     match offset {
         Some(offset) => {
-            let mut offsetG = G.clone();
+            let mut offsetG = *G;
             offsetG.mul_assign(&*SECP, &offset)?;
             Ok(PublicKey::from_combination(&*SECP, vec![
                 &total,
