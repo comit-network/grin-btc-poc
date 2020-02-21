@@ -125,6 +125,7 @@ pub fn decsig(y: &KeyPair, EncryptedSignature { R, s_hat, .. }: &EncryptedSignat
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct RecoveryKey {
     Y: PublicKey,
     s_hat: SecretKey,
@@ -175,6 +176,21 @@ impl From<Signature> for secp256k1zkp::Signature {
         let mut sig = secp256k1zkp::Signature::from_compact(&*SECP, &buffer).unwrap();
         sig.normalize_s(&*SECP);
         sig
+    }
+}
+
+impl From<secp256k1zkp::Signature> for Signature {
+    fn from(from: secp256k1zkp::Signature) -> Self {
+        let bytes = from.serialize_compact(&*SECP);
+        let mut R_x = [0u8; 32];
+        let mut s = [0u8; 32];
+        R_x.copy_from_slice(&bytes[0..32]);
+        s.copy_from_slice(&bytes[32..64]);
+
+        Self {
+            R_x: SecretKey::from_slice(&*SECP, &R_x).unwrap(),
+            s: SecretKey::from_slice(&*SECP, &s).unwrap(),
+        }
     }
 }
 

@@ -1,15 +1,13 @@
 use grin_btc_poc::{
     alice::Alice0,
+    bitcoin::rpc::{generate_blocks, get_rawtransaction, new_owned_output, send_rawtransaction},
     bob::Bob0,
-    keypair::{KeyPair,random_secret_key},
+    keypair::{random_secret_key, KeyPair},
     setup_parameters::{Bitcoin, Grin, GrinFunderSecret, GrinRedeemerSecret, SetupParameters},
-    bitcoin::util::{send_rawtransaction, new_owned_output},
 };
-use std::str::FromStr;
-
 fn main() -> Result<(), ()> {
     let bob_input = new_owned_output(3).expect("funding bob initial input");
-    dbg!(&bob_input);
+
     let bob_change = KeyPair::new_random();
     let alice_redeem_keypair = KeyPair::new_random();
     let bob_refund_keypair = KeyPair::new_random();
@@ -36,7 +34,7 @@ fn main() -> Result<(), ()> {
             100_000_000,
             1_000,
             0,
-            vec![(bob_input.outpoint , bob_input.txout.value)],
+            vec![(bob_input.outpoint, bob_input.txout.value)],
             bob_change.to_bitcoin_address(),
             bob_refund_keypair.to_bitcoin_address(),
             alice_redeem_keypair.to_bitcoin_address(),
@@ -64,8 +62,26 @@ fn main() -> Result<(), ()> {
 
     let bob2 = bob1.receive(message4)?;
 
-    let funding_tx = &bob2.beta_fund_action.sign_inputs(vec![bob_input]).expect("funding tx signing");
+    let funding_tx = &bob2
+        .beta_fund_action
+        .sign_inputs(vec![bob_input])
+        .expect("funding tx signing");
 
     send_rawtransaction(&funding_tx).expect("funding tx broadcast");
+
+    generate_blocks(1);
+
+    let redeem_tx = &alice2.beta_redeem_action.transaction;
+
+    send_rawtransaction(&redeem_tx).expect("redeem tx broadcast");
+
+    generate_blocks(1);
+
+    let bobs_view_of_redeem_tx = get_rawtransaction(&redeem_tx.txid()).expect("bob can get redeem");
+
+    let bob3 = bob2.receive_beta_redeem_tx(bobs_view_of_redeem_tx);
+
+    dbg!(bob3);
+
     Ok(())
 }

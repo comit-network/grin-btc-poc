@@ -129,7 +129,7 @@ impl Alice1 {
 }
 
 pub struct Alice2 {
-    alpha_fund_action: grin::action::Fund,
-    alpha_refund_action: grin::action::Refund,
-    beta_redeem_action: bitcoin::action::Redeem,
+    pub alpha_fund_action: grin::action::Fund,
+    pub alpha_refund_action: grin::action::Refund,
+    pub beta_redeem_action: bitcoin::action::Redeem,
 }

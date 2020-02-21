@@ -89,10 +89,10 @@ impl EncryptedRedeem {
         )
         .unwrap();
 
-        let R_hat = PublicKey::from_combination(&*SECP, vec![
-            &redeemer_SKs.r_redeem.public_key,
-            &funder_PKs.R_redeem,
-        ])
+        let R_hat = PublicKey::from_combination(
+            &*SECP,
+            vec![&redeemer_SKs.r_redeem.public_key, &funder_PKs.R_redeem],
+        )
         .unwrap();
         let R = PublicKey::from_combination(&*SECP, vec![&R_hat, &Y]).unwrap();
 
@@ -114,10 +114,10 @@ impl EncryptedRedeem {
         let incomplete_transaction_to_special_output = {
             let inputs = vec![(
                 init.fund_output_amount(),
-                PublicKey::from_combination(&*SECP, vec![
-                    &redeemer_SKs.x.public_key,
-                    &funder_PKs.X,
-                ])
+                PublicKey::from_combination(
+                    &*SECP,
+                    vec![&redeemer_SKs.x.public_key, &funder_PKs.X],
+                )
                 .unwrap(),
             )];
 
@@ -176,6 +176,7 @@ impl EncryptedRedeem {
     }
 }
 
+#[derive(Debug)]
 pub struct Redeem {
     transaction_to_special_output: Transaction,
     special_output_x: KeyPair,

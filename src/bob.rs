@@ -2,6 +2,7 @@ use crate::{
     bitcoin,
     commit::Commitment,
     grin, keypair,
+    keypair::KeyPair,
     messages::{Message0, Message1, Message2, Message3, Message4},
     setup_parameters::{self, SetupParameters},
 };
@@ -61,6 +62,8 @@ impl Bob0 {
             &alice_beta_refund_signature,
         )?;
 
+        let beta_recovery_key = crate::ecdsa::reckey(&Y, &beta_redeem_encsig);
+
         // TODO: handle the fact that grin signing produces both signatures and
         // "partial" bulletproofs
         let alpha_redeemer_sigs = grin::sign::redeemer(
@@ -83,6 +86,7 @@ impl Bob0 {
             Y,
             beta_fund_action: beta_actions.fund,
             beta_refund_action: beta_actions.refund,
+            beta_recovery_key,
         };
 
         let message = Message3 {
@@ -105,6 +109,7 @@ pub struct Bob1 {
     Y: keypair::PublicKey,
     beta_fund_action: bitcoin::action::Fund,
     beta_refund_action: bitcoin::action::Refund,
+    beta_recovery_key: crate::ecdsa::RecoveryKey,
 }
 
 impl Bob1 {
@@ -122,6 +127,7 @@ impl Bob1 {
             beta_fund_action: self.beta_fund_action,
             beta_refund_action: self.beta_refund_action,
             alpha_encrypted_redeem_action,
+            beta_recovery_key: self.beta_recovery_key,
         })
     }
 }
@@ -130,4 +136,45 @@ pub struct Bob2 {
     pub beta_fund_action: bitcoin::action::Fund,
     pub beta_refund_action: bitcoin::action::Refund,
     pub alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
+    pub beta_recovery_key: crate::ecdsa::RecoveryKey,
+}
+
+impl Bob2 {
+    pub fn receive_beta_redeem_tx(self, transaction: bitcoin::Transaction) -> Bob3 {
+        use keypair::SECP;
+        use secp256k1zkp::Signature;
+
+        let y = transaction.input[0]
+            .witness
+            .iter()
+            .find_map(|witness| {
+                if witness.len() == 0 {
+                    return None;
+                }
+                let sig_bytes = &witness[..witness.len() - 1]; // remove last byte which is SIGHASH flag
+                match Signature::from_der(&*SECP, sig_bytes) {
+                    // TODO: instead of just blindly trying everything, find the signature corresponding to Bob's key
+                    Ok(sig) => {
+                        match crate::ecdsa::recover(
+                            &crate::ecdsa::Signature::from(sig),
+                            &self.beta_recovery_key,
+                        ) {
+                            Ok(y) => Some(KeyPair::new(y)),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                }
+            })
+            .expect("Alice can't steal the money without revealing y");
+
+        Bob3 {
+            alpha_redeem_action: self.alpha_encrypted_redeem_action.decrypt(&y),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Bob3 {
+    pub alpha_redeem_action: grin::action::Redeem,
 }

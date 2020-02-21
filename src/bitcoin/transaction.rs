@@ -3,6 +3,7 @@ use ::bitcoin::{
     blockdata::script, hashes::sha256d::Hash, network::constants::Network, Address, OutPoint,
     Script, Transaction, TxIn, TxOut,
 };
+use bitcoin::blockdata::opcodes;
 use secp256k1zkp::key::PublicKey;
 
 pub fn fund_transaction(
@@ -21,6 +22,7 @@ pub fn fund_transaction(
             compressed: true,
         })
         .push_int(2)
+        .push_opcode(opcodes::all::OP_CHECKMULTISIG)
         .into_script();
 
     let fund_output_addr = Address::p2wsh(&fund_output_script, Network::Regtest);
