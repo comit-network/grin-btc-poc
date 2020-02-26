@@ -6,18 +6,35 @@ use crate::{
     keypair::KeyPair,
 };
 use bitcoin_hashes::sha256d;
-use std::str::FromStr;
+use std::{
+    process::{Child, Command, Stdio},
+    str::FromStr,
+};
 
 pub struct Node {
     url: String,
+    process: Child,
 }
 
 impl Node {
-    pub fn start() -> anyhow::Result<Wallets> {
-        // TODO: Start bitcoind here instead of from command line
+    pub fn start() -> anyhow::Result<(Node, Wallets)> {
+        let process = Command::new("bitcoind")
+            .args(&[
+                "-regtest",
+                "-server",
+                "-rpcuser=user",
+                "-rpcpassword=password",
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+        std::thread::sleep(std::time::Duration::from_millis(2000));
 
         let url = "http://user:password@localhost:18443";
-        let node = Node { url: url.into() };
+        let node = Node {
+            process,
+            url: url.into(),
+        };
 
         node.generate_blocks(100)?;
 
@@ -26,9 +43,19 @@ impl Node {
         let funder_wallet = FunderWallet::new(url.into(), fund_input)?;
         let redeemer_wallet = RedeemerWallet::new(url.into());
 
-        Ok(Wallets {
+        Ok((node, Wallets {
             funder_wallet,
             redeemer_wallet,
+        }))
+    }
+
+    pub fn kill(&mut self) -> anyhow::Result<()> {
+        self.process.kill().map_err(|e| {
+            anyhow::anyhow!(
+                "could not kill bitcoind process {}: {}",
+                self.process.id(),
+                e
+            )
         })
     }
 

@@ -21,10 +21,13 @@ fn main() -> anyhow::Result<()> {
     let bob_alpha_starting_balance = bob_alpha_wallet.get_balance()?;
 
     // Set up Bitcoin wallets
-    let bitcoin::Wallets {
-        funder_wallet: bob_beta_wallet,
-        redeemer_wallet: alice_beta_wallet,
-    } = bitcoin::Node::start()?;
+    let (
+        mut bitcoin_node,
+        bitcoin::Wallets {
+            funder_wallet: bob_beta_wallet,
+            redeemer_wallet: alice_beta_wallet,
+        },
+    ) = bitcoin::Node::start()?;
 
     // Set-up parameters
     let grin_funder_secret_init = GrinFunderSecret::new_random();
@@ -97,5 +100,6 @@ fn main() -> anyhow::Result<()> {
     );
 
     grin::Wallets::clean_up();
+    bitcoin_node.kill()?;
     Ok(())
 }
