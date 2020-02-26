@@ -89,8 +89,7 @@ pub struct Alice1 {
     bob_PKs_beta: bitcoin::PKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
     bulletproof_round_1_bob: grin::bulletproof::Round1,
-    // TODO: Remove pub after testing once y is extracted from the other chain
-    pub y: keypair::KeyPair,
+    y: keypair::KeyPair,
 }
 
 impl Alice1 {
