@@ -6,11 +6,9 @@ use crate::{
     setup_parameters::{self, SetupParameters},
 };
 
-// TODO: Figure out what to do with bulletproof keys, if anything. For now,
-// ignore them since we don't know how we are gonna tackle them
 pub struct Alice0 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinFunderSecret,
+    secret_init_grin: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
@@ -20,17 +18,17 @@ pub struct Alice0 {
 impl Alice0 {
     pub fn new(
         init: SetupParameters,
-        secret_grin_init: setup_parameters::GrinFunderSecret,
-    ) -> (Self, Message0) {
-        let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen();
+        secret_init_grin: setup_parameters::GrinFunderSecret,
+    ) -> anyhow::Result<(Self, Message0)> {
+        let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen()?;
         let SKs_beta = bitcoin::SKs::keygen();
-        let y = keypair::KeyPair::from_slice(b"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
+        let y = keypair::KeyPair::new_random();
 
         let commitment = Commitment::commit(&SKs_alpha.public(), &SKs_beta.public(), &y.public_key);
 
         let state = Alice0 {
             init,
-            secret_grin_init,
+            secret_init_grin,
             SKs_alpha,
             SKs_beta,
             y,
@@ -42,22 +40,28 @@ impl Alice0 {
             bulletproof_round_1_alice,
         };
 
-        (state, message)
+        Ok((state, message))
     }
 
-    pub fn receive(self, message: Message1) -> Result<(Alice1, Message2), ()> {
+    pub fn receive(mut self, mut message: Message1) -> anyhow::Result<(Alice1, Message2)> {
         let opening = Opening::new(
             self.SKs_alpha.public(),
             self.SKs_beta.public(),
             self.y.public_key,
         );
 
+        grin::normalize_redeem_keys_alice(
+            &mut self.SKs_alpha.r_redeem,
+            &mut message.PKs_alpha.R_redeem,
+            &mut self.y,
+        )?;
+
         let beta_redeemer_sigs =
             bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message.PKs_beta);
 
         let state = Alice1 {
             init: self.init,
-            secret_grin_init: self.secret_grin_init,
+            secret_init_grin: self.secret_init_grin,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
             bob_PKs_alpha: message.PKs_alpha,
@@ -78,21 +82,22 @@ impl Alice0 {
 
 pub struct Alice1 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinFunderSecret,
+    secret_init_grin: setup_parameters::GrinFunderSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bob_PKs_alpha: grin::PKs,
     bob_PKs_beta: bitcoin::PKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
     bulletproof_round_1_bob: grin::bulletproof::Round1,
-    y: keypair::KeyPair,
+    // TODO: Remove pub after testing once y is extracted from the other chain
+    pub y: keypair::KeyPair,
 }
 
 impl Alice1 {
-    pub fn receive(self, message: Message3) -> Result<(Alice2, Message4), ()> {
+    pub fn receive(self, message: Message3) -> anyhow::Result<(Alice2, Message4)> {
         let (alpha_actions, alpha_redeem_encsig) = grin::sign::funder(
             &self.init.alpha,
-            &self.secret_grin_init,
+            &self.secret_init_grin,
             &self.SKs_alpha,
             &self.bob_PKs_alpha,
             &self.y.public_key,
@@ -100,11 +105,7 @@ impl Alice1 {
             &self.bulletproof_round_1_bob,
             &self.bulletproof_round_1_alice,
             &message.bulletproof_round_2_bob,
-        )
-        .map_err(|e| {
-            println!("Grin signature verification failed: {:?}", e);
-            ()
-        })?;
+        )?;
 
         let beta_encrypted_redeem_action = bitcoin::action::EncryptedRedeem::new(
             &self.init.beta,

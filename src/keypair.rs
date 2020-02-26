@@ -1,5 +1,5 @@
 use rand::Rng;
-pub use secp256k1zkp::key::{PublicKey, SecretKey};
+pub use secp256k1zkp::key::{PublicKey, SecretKey, ZERO_KEY};
 use secp256k1zkp::{pedersen, ContextFlag, Message, Secp256k1, Signature};
 use crate::bitcoin::{BitcoinPublicKey,Address, Network};
 
@@ -98,7 +98,7 @@ pub trait Negate {
 
 impl Negate for PublicKey {
     fn negate(&self) -> Self {
-        let mut negated = self.clone();
+        let mut negated = *self;
         negated.mul_assign(&*SECP, &*MINUS_ONE).unwrap();
         negated
     }

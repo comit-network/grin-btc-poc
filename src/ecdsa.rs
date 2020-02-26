@@ -3,12 +3,13 @@ use crate::{
     keypair::{random_secret_key, KeyPair, Negate, PublicKey, SecretKey, XCoor, G, SECP},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Signature {
     s: SecretKey,
     R_x: SecretKey,
 }
 
+#[derive(Debug)]
 pub struct EncryptedSignature {
     R: PublicKey,
     R_hat: PublicKey,
@@ -18,10 +19,10 @@ pub struct EncryptedSignature {
 
 pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSignature {
     let r = random_secret_key();
-    let mut R_hat = G.clone();
+    let mut R_hat = *G;
     R_hat.mul_assign(&*SECP, &r).unwrap();
 
-    let mut R = Y.clone();
+    let mut R = *Y;
     R.mul_assign(&*SECP, &r).unwrap();
 
     let proof = dleq::prove(&G, &R_hat, &Y, &R, &r);
@@ -29,7 +30,7 @@ pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSign
     let s_hat = {
         let R_x = SecretKey::from_slice(&*SECP, &R.x_coor()).unwrap();
 
-        let mut s_hat = R_x.clone();
+        let mut s_hat = R_x;
         s_hat.mul_assign(&*SECP, &x.secret_key).unwrap();
         s_hat
             .add_assign(
@@ -38,7 +39,7 @@ pub fn encsign(x: &KeyPair, Y: &PublicKey, message_hash: &[u8]) -> EncryptedSign
             )
             .unwrap();
 
-        let mut r_inv = r.clone();
+        let mut r_inv = r;
         r_inv.inv_assign(&*SECP).unwrap();
 
         s_hat.mul_assign(&*SECP, &r_inv).unwrap();
@@ -85,15 +86,15 @@ pub fn encverify(
     let U0 = {
         let mut u0 = message_hash;
         u0.mul_assign(&*SECP, &s_hat_inv).unwrap();
-        let mut U0 = G.clone();
+        let mut U0 = *G;
         U0.mul_assign(&*SECP, &u0).unwrap();
         U0
     };
 
     let U1 = {
-        let mut u1 = R_x.clone();
+        let mut u1 = R_x;
         u1.mul_assign(&*SECP, &s_hat_inv).unwrap();
-        let mut U1 = X.clone();
+        let mut U1 = *X;
         U1.mul_assign(&*SECP, &u1).unwrap();
         U1
     };
@@ -144,25 +145,25 @@ pub fn reckey(
 pub fn recover(
     Signature { s, .. }: &Signature,
     RecoveryKey { Y, s_hat }: &RecoveryKey,
-) -> Result<SecretKey, ()> {
+) -> anyhow::Result<KeyPair> {
     let y_macron = {
         let mut s_inv = s.clone();
-        s_inv.inv_assign(&*SECP).unwrap();
+        s_inv.inv_assign(&*SECP)?;
 
         let mut y_macron = s_hat.clone();
-        y_macron.mul_assign(&*SECP, &s_inv).unwrap();
+        y_macron.mul_assign(&*SECP, &s_inv)?;
         y_macron
     };
 
-    let mut Gy_macron = G.clone();
-    Gy_macron.mul_assign(&*SECP, &y_macron).unwrap();
+    let mut Gy_macron = *G;
+    Gy_macron.mul_assign(&*SECP, &y_macron)?;
 
-    if Gy_macron == Y.clone() {
-        Ok(y_macron)
+    if Gy_macron == *Y {
+        Ok(KeyPair::new(y_macron))
     } else if Gy_macron == Y.negate() {
-        Ok(y_macron.negate())
+        Ok(KeyPair::new(y_macron.negate()))
     } else {
-        Err(())
+        unreachable!("cannot be triggered")
     }
 }
 
@@ -181,7 +182,9 @@ impl From<Signature> for secp256k1zkp::Signature {
 
 impl From<secp256k1zkp::Signature> for Signature {
     fn from(from: secp256k1zkp::Signature) -> Self {
-        let bytes = from.serialize_compact(&*SECP);
+        let mut sig = from;
+        sig.normalize_s(&*SECP);
+        let bytes = sig.serialize_compact(&*SECP);
         let mut R_x = [0u8; 32];
         let mut s = [0u8; 32];
         R_x.copy_from_slice(&bytes[0..32]);
@@ -240,6 +243,6 @@ mod test {
         let rec_key = reckey(&y.public_key, &encsig);
         let y_tag = recover(&sig, &rec_key).unwrap();
 
-        assert_eq!(y.secret_key, y_tag);
+        assert_eq!(y.secret_key, y_tag.secret_key);
     }
 }

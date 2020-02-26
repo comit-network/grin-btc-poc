@@ -1,23 +1,27 @@
 use crate::{
-    bitcoin::{self, Hash, SighashComponents},
+    bitcoin::{
+        action,
+        transaction::{fund_transaction, redeem_transaction, refund_transaction},
+        PKs, SKs,
+    },
     ecdsa,
     keypair::{self, PublicKey},
     setup_parameters,
 };
+use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents};
 use secp256k1zkp::{self, Message};
 
 // TODO: Remove Y from spec version
 // TODO: Remove redeem signature from output in spec
 pub fn redeemer(
     init: &setup_parameters::Bitcoin,
-    redeemer_SKs: &bitcoin::SKs,
-    funder_PKs: &bitcoin::PKs,
+    redeemer_SKs: &SKs,
+    funder_PKs: &PKs,
 ) -> secp256k1zkp::Signature {
     let (fund_transaction, fund_output_script) =
-        bitcoin::transaction::fund_transaction(&init, &redeemer_SKs.x.public_key, &funder_PKs.X);
+        fund_transaction(&init, &redeemer_SKs.x.public_key, &funder_PKs.X);
 
-    let refund_transaction =
-        bitcoin::transaction::refund_transaction(&init, fund_transaction.txid());
+    let refund_transaction = refund_transaction(&init, fund_transaction.txid());
 
     let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
         &refund_transaction.input[0],
@@ -31,30 +35,29 @@ pub fn redeemer(
 }
 
 pub struct BitcoinFunderActions {
-    pub fund: bitcoin::action::Fund,
-    pub refund: bitcoin::action::Refund,
+    pub fund: action::Fund,
+    pub refund: action::Refund,
 }
 
 // TODO: Modify the spec to not pass redeemer's redeem signature to funder
 pub fn funder(
     init: &setup_parameters::Bitcoin,
-    funder_SKs: &bitcoin::SKs,
-    redeemer_PKs: &bitcoin::PKs,
+    funder_SKs: &SKs,
+    redeemer_PKs: &PKs,
     Y: &PublicKey,
     redeemer_refund_signature: &secp256k1zkp::Signature,
-) -> Result<(BitcoinFunderActions, ecdsa::EncryptedSignature), ()> {
+) -> anyhow::Result<(BitcoinFunderActions, ecdsa::EncryptedSignature)> {
     let (fund_transaction, fund_output_script) =
-        bitcoin::transaction::fund_transaction(&init, &redeemer_PKs.X, &funder_SKs.x.public_key);
+        fund_transaction(&init, &redeemer_PKs.X, &funder_SKs.x.public_key);
 
-    let fund = bitcoin::action::Fund {
+    let fund = action::Fund {
         transaction: fund_transaction.clone(),
     };
 
     let refund = {
-        let refund_transaction =
-            bitcoin::transaction::refund_transaction(&init, fund_transaction.txid());
+        let refund_transaction = refund_transaction(&init, fund_transaction.txid());
 
-        let refund_digest = bitcoin::SighashComponents::new(&refund_transaction).sighash_all(
+        let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
             &refund_transaction.input[0],
             &fund_output_script,
             fund_transaction.output[0].value,
@@ -63,22 +66,23 @@ pub fn funder(
             .expect("Should not fail because it is a hash");
 
         if !keypair::verify_ecdsa(&refund_digest, &redeemer_refund_signature, &redeemer_PKs.X) {
-            return Err(());
+            return Err(anyhow::anyhow!(
+                "failed to verify redeemer's Bitcoin refund signature"
+            ));
         }
 
         let funder_refund_signature = funder_SKs.x.sign_ecdsa(&refund_digest);
 
-        bitcoin::action::Refund::new(
+        action::Refund::new(
             refund_transaction,
-            redeemer_refund_signature.clone(),
+            *redeemer_refund_signature,
             funder_refund_signature,
         )
     };
 
     let encrypted_redeem_signature = {
-        let redeem_transaction =
-            bitcoin::transaction::redeem_transaction(&init, fund_transaction.txid());
-        let redeem_digest = bitcoin::SighashComponents::new(&redeem_transaction).sighash_all(
+        let redeem_transaction = redeem_transaction(&init, fund_transaction.txid());
+        let redeem_digest = SighashComponents::new(&redeem_transaction).sighash_all(
             &redeem_transaction.input[0],
             &fund_output_script,
             fund_transaction.output[0].value,

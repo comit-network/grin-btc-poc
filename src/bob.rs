@@ -1,15 +1,15 @@
 use crate::{
     bitcoin,
     commit::Commitment,
-    grin, keypair,
-    keypair::KeyPair,
+    grin,
+    keypair::self,
     messages::{Message0, Message1, Message2, Message3, Message4},
     setup_parameters::{self, SetupParameters},
 };
 
 pub struct Bob0 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinRedeemerSecret,
+    secret_init_grin: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     bulletproof_round_1_alice: grin::bulletproof::Round1,
@@ -20,15 +20,15 @@ pub struct Bob0 {
 impl Bob0 {
     pub fn new(
         init: SetupParameters,
-        secret_grin_init: setup_parameters::GrinRedeemerSecret,
+        secret_init_grin: setup_parameters::GrinRedeemerSecret,
         message0: Message0,
-    ) -> (Bob0, Message1) {
-        let (SKs_alpha, bulletproof_round_1_bob) = grin::keygen();
+    ) -> anyhow::Result<(Bob0, Message1)> {
+        let (SKs_alpha, bulletproof_round_1_bob) = grin::keygen()?;
         let SKs_beta = bitcoin::SKs::keygen();
 
         let state = Bob0 {
             init,
-            secret_grin_init,
+            secret_init_grin,
             SKs_alpha: SKs_alpha.clone(),
             SKs_beta: SKs_beta.clone(),
             bulletproof_round_1_alice: message0.bulletproof_round_1_alice,
@@ -42,17 +42,23 @@ impl Bob0 {
             bulletproof_round_1_bob,
         };
 
-        (state, message)
+        Ok((state, message))
     }
 
     pub fn receive(
-        self,
+        mut self,
         Message2 {
             opening,
             beta_redeemer_sigs: alice_beta_refund_signature,
         }: Message2,
-    ) -> Result<(Bob1, Message3), ()> {
-        let (alice_PKs_alpha, alice_PKs_beta, Y) = opening.open(self.alice_commitment)?;
+    ) -> anyhow::Result<(Bob1, Message3)> {
+        let (mut alice_PKs_alpha, alice_PKs_beta, mut Y) = opening.open(self.alice_commitment)?;
+
+        grin::normalize_redeem_keys_bob(
+            &mut alice_PKs_alpha.R_redeem,
+            &mut self.SKs_alpha.r_redeem,
+            &mut Y,
+        )?;
 
         let (beta_actions, beta_redeem_encsig) = bitcoin::sign::funder(
             &self.init.beta,
@@ -68,17 +74,17 @@ impl Bob0 {
         // "partial" bulletproofs
         let alpha_redeemer_sigs = grin::sign::redeemer(
             &self.init.alpha,
-            &self.secret_grin_init,
+            &self.secret_init_grin,
             &self.SKs_alpha,
             &alice_PKs_alpha,
             &Y,
             &self.bulletproof_round_1_bob,
             &self.bulletproof_round_1_alice,
-        );
+        )?;
 
         let state = Bob1 {
             init: self.init,
-            secret_grin_init: self.secret_grin_init,
+            secret_init_grin: self.secret_init_grin,
             SKs_alpha: self.SKs_alpha,
             SKs_beta: self.SKs_beta,
             alice_PKs_alpha,
@@ -101,7 +107,7 @@ impl Bob0 {
 
 pub struct Bob1 {
     init: SetupParameters,
-    secret_grin_init: setup_parameters::GrinRedeemerSecret,
+    secret_init_grin: setup_parameters::GrinRedeemerSecret,
     SKs_alpha: grin::SKs,
     SKs_beta: bitcoin::SKs,
     alice_PKs_alpha: grin::PKs,
@@ -113,10 +119,16 @@ pub struct Bob1 {
 }
 
 impl Bob1 {
-    pub fn receive(self, message: Message4) -> Result<Bob2, ()> {
+    pub fn receive(self, message: Message4) -> anyhow::Result<Bob2> {
+        let beta_redeem_event = bitcoin::event::Redeem::new(
+            &self.init.beta,
+            &self.alice_PKs_beta,
+            &self.SKs_beta.public(),
+        );
+
         let alpha_encrypted_redeem_action = grin::action::EncryptedRedeem::new(
             self.init.alpha,
-            self.secret_grin_init,
+            self.secret_init_grin,
             self.SKs_alpha,
             self.alice_PKs_alpha,
             self.Y,
@@ -128,6 +140,7 @@ impl Bob1 {
             beta_refund_action: self.beta_refund_action,
             alpha_encrypted_redeem_action,
             beta_recovery_key: self.beta_recovery_key,
+            beta_redeem_event,
         })
     }
 }
@@ -137,44 +150,5 @@ pub struct Bob2 {
     pub beta_refund_action: bitcoin::action::Refund,
     pub alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
     pub beta_recovery_key: crate::ecdsa::RecoveryKey,
-}
-
-impl Bob2 {
-    pub fn receive_beta_redeem_tx(self, transaction: bitcoin::Transaction) -> Bob3 {
-        use keypair::SECP;
-        use secp256k1zkp::Signature;
-
-        let y = transaction.input[0]
-            .witness
-            .iter()
-            .find_map(|witness| {
-                if witness.len() == 0 {
-                    return None;
-                }
-                let sig_bytes = &witness[..witness.len() - 1]; // remove last byte which is SIGHASH flag
-                match Signature::from_der(&*SECP, sig_bytes) {
-                    // TODO: instead of just blindly trying everything, find the signature corresponding to Bob's key
-                    Ok(sig) => {
-                        match crate::ecdsa::recover(
-                            &crate::ecdsa::Signature::from(sig),
-                            &self.beta_recovery_key,
-                        ) {
-                            Ok(y) => Some(KeyPair::new(y)),
-                            _ => None,
-                        }
-                    }
-                    _ => None,
-                }
-            })
-            .expect("Alice can't steal the money without revealing y");
-
-        Bob3 {
-            alpha_redeem_action: self.alpha_encrypted_redeem_action.decrypt(&y),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Bob3 {
-    pub alpha_redeem_action: grin::action::Redeem,
+    pub beta_redeem_event: bitcoin::event::Redeem,
 }

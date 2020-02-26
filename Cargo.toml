@@ -5,19 +5,28 @@ authors = ["CoBloX developers <team@coblox.tech>", "Lloyd Fournier <lloyd.fourn@
 edition = "2018"
 
 [dependencies]
-blake2 = "0.8"
-grin_secp256k1zkp = "0.7"
-generic-array = "0.12"
-lazy_static = "1.4"
+anyhow = "1"
 bitcoin = { version = "0.19", git = "https://github.com/jaspervdm/rust-bitcoin", branch = "zkp", features = ["bitcoinconsensus"] }
 bitcoin_hashes = "0.7"
-rand = "0.7"
-serde = "1"
-sha2 = "0.8"
+blake2 = "0.8"
+generic-array = "0.12"
+grin_chain = "3"
 grin_core = "3"
+grin_keychain = "3"
+grin_secp256k1zkp = "0.7"
+grin_util = "3"
+grin_wallet_controller = "3"
+grin_wallet_impls = "3"
+grin_wallet_libwallet = "3"
+grin_wallet_util = "3"
 hex = "0.4"
+lazy_static = "1.4"
 purerust_secp256k1 = { package = "libsecp256k1", version = "0.3" }
-ureq = { version = "0.11", features = ["json"]}
+rand = "0.7"
+sha2 = "0.8"
+thiserror = "1"
+ureq = { version = "0.11", default-features = false, features = ["json"]}
+testcontainers = "0.8"
 
 [patch.crates-io]
 grin_secp256k1zkp = { git = "https://github.com/jaspervdm/rust-secp256k1-zkp", branch = "master" }

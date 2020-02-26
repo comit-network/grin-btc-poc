@@ -1,60 +1,18 @@
 use crate::{
     bitcoin::{
-        rpc::OwnedOutput,
         transaction::{fund_transaction, redeem_transaction},
-        Hash, PKs, SKs, SigHashType, SighashComponents, Signature, Transaction,
+        wallet::{signature_into_witness, FunderWallet, RedeemerWallet},
+        Client, PKs, SKs, Signature, Transaction,
     },
     ecdsa,
-    keypair::{KeyPair, PublicKey, SECP},
-    setup_parameters,
+    keypair::KeyPair,
+    setup_parameters, Execute,
 };
-use bitcoin::{hashes::hash160, Script};
+use bitcoin::{hashes::Hash, util::bip143::SighashComponents, Script};
 use secp256k1zkp::Message;
 
 pub struct Fund {
     pub transaction: Transaction,
-}
-
-impl Fund {
-    pub fn sign_inputs(&self, owned_outputs: Vec<OwnedOutput>) -> Result<Transaction, ()> {
-        let mut completed_tx = self.transaction.clone();
-        let sighash_components = SighashComponents::new(&completed_tx);
-        for ref mut input in &mut completed_tx.input {
-            let owned_output = match owned_outputs
-                .iter()
-                .find(|candidate| candidate.outpoint == input.previous_output)
-            {
-                Some(matched) => matched,
-                None => return Err(()),
-            };
-
-            let fund_digest = {
-                let digest = sighash_components.sighash_all(
-                    &input,
-                    &generate_prev_script_p2wpkh(&owned_output.keypair.public_key),
-                    owned_output.txout.value,
-                );
-
-                Message::from_slice(&digest.into_inner()).expect("always correct length")
-            };
-
-            let signature_element = {
-                let signature = owned_output.keypair.sign_ecdsa(&fund_digest);
-                signature_into_witness(signature)
-            };
-
-            input.witness = vec![
-                signature_element,
-                owned_output
-                    .keypair
-                    .public_key
-                    .serialize_vec(&*SECP, true)
-                    .to_vec(),
-            ]
-        }
-
-        Ok(completed_tx)
-    }
 }
 
 pub struct Refund {
@@ -113,16 +71,15 @@ impl EncryptedRedeem {
     }
 
     pub fn decrypt(self, y: &KeyPair) -> Redeem {
-        let funder_sig = dbg!(ecdsa::decsig(&y, &self.funder_encsig)).into();
+        let funder_sig = ecdsa::decsig(&y, &self.funder_encsig).into();
 
         let mut completed_transaction = self.transaction;
-        dbg!(crate::ecdsa::reckey(&y.public_key, &self.funder_encsig));
-        dbg!(funder_sig);
         let funder_witness = signature_into_witness(funder_sig);
         let redeemer_witness = signature_into_witness(self.redeemer_sig);
 
         completed_transaction.input[0].witness = vec![
-            vec![], // You have to put some extra shit on the stack because OP_CHECKMULTISIG is buggy
+            vec![], /* You have to put some extra shit on the stack because OP_CHECKMULTISIG is
+                     * buggy */
             redeemer_witness,
             funder_witness,
             self.fund_output_script.to_bytes(),
@@ -134,25 +91,23 @@ impl EncryptedRedeem {
     }
 }
 
+#[derive(Clone)]
 pub struct Redeem {
     pub transaction: Transaction,
 }
 
-fn generate_prev_script_p2wpkh(public_key: &PublicKey) -> Script {
-    let public_key_hash =
-        hash160::Hash::hash(public_key.serialize_vec(&*SECP, true).to_vec().as_ref());
+impl Execute for Fund {
+    type Wallet = FunderWallet;
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<()> {
+        let transaction = wallet.sign_input(self.transaction)?;
 
-    let mut prev_script = vec![0x76, 0xa9, 0x14];
-
-    prev_script.append(&mut public_key_hash[..].to_vec());
-    prev_script.push(0x88);
-    prev_script.push(0xac);
-
-    Script::from(prev_script)
+        wallet.send_rawtransaction(&transaction)
+    }
 }
 
-pub fn signature_into_witness(sig: Signature) -> Vec<u8> {
-    let mut serialized_signature = sig.serialize_der(&*SECP).to_vec();
-    serialized_signature.push(SigHashType::All as u8);
-    serialized_signature
+impl Execute for Redeem {
+    type Wallet = RedeemerWallet;
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<()> {
+        wallet.send_rawtransaction(&self.transaction)
+    }
 }

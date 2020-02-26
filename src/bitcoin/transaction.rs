@@ -14,11 +14,11 @@ pub fn fund_transaction(
     let fund_output_script = script::Builder::new()
         .push_int(2)
         .push_key(&::bitcoin::util::key::PublicKey {
-            key: redeemer_key.clone(),
+            key: *redeemer_key,
             compressed: true,
         })
         .push_key(&::bitcoin::util::key::PublicKey {
-            key: funder_key.clone(),
+            key: *funder_key,
             compressed: true,
         })
         .push_int(2)
@@ -27,16 +27,12 @@ pub fn fund_transaction(
 
     let fund_output_addr = Address::p2wsh(&fund_output_script, Network::Regtest);
     let transaction = Transaction {
-        input: init
-            .inputs
-            .iter()
-            .map(|i| TxIn {
-                previous_output: i.0.clone(),
-                sequence: 0xffffffff,
-                witness: Vec::new(),
-                script_sig: Script::new(),
-            })
-            .collect(),
+        input: vec![TxIn {
+            previous_output: init.input.outpoint,
+            sequence: 0xffff_ffff,
+            witness: Vec::new(),
+            script_sig: Script::new(),
+        }],
         output: vec![
             TxOut {
                 script_pubkey: fund_output_addr.script_pubkey(),
@@ -64,7 +60,7 @@ pub fn refund_transaction(
                 txid: fund_transaction_id,
                 vout: 0,
             },
-            sequence: 0xffffffff,
+            sequence: 0xffff_ffff,
             witness: Vec::new(),
             script_sig: Script::new(),
         }],
@@ -87,7 +83,7 @@ pub fn redeem_transaction(
                 txid: fund_transaction_id,
                 vout: 0,
             },
-            sequence: 0xffffffff,
+            sequence: 0xffff_ffff,
             witness: Vec::new(),
             script_sig: Script::new(),
         }],

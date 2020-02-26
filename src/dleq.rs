@@ -1,6 +1,7 @@
 use crate::keypair::{KeyPair, PublicKey, SecretKey, SECP};
 use sha2::{Digest, Sha256};
 
+#[derive(Debug)]
 pub struct Proof {
     s: SecretKey,
     c: SecretKey,
@@ -10,11 +11,11 @@ pub fn prove(G: &PublicKey, Gx: &PublicKey, H: &PublicKey, Hx: &PublicKey, x: &S
     let r = KeyPair::new_random();
 
     // Gr
-    let mut Gr = G.clone();
+    let mut Gr = *G;
     Gr.mul_assign(&*SECP, &r.secret_key).unwrap();
 
     // Hr
-    let mut Hr = H.clone();
+    let mut Hr = *H;
     Hr.mul_assign(&*SECP, &r.secret_key).unwrap();
 
     // c = H(G | Gx | H | Hx | Gr | Hr)
@@ -47,20 +48,20 @@ pub fn verify(
 
     // Gr = Gs + (Gx * -c) = Gr + Gcx - Gcx
     let Gr = {
-        let mut Gxc_neg = Gx.clone();
+        let mut Gxc_neg = *Gx;
         Gxc_neg.mul_assign(&*SECP, &c_neg).unwrap();
 
-        let mut Gs = G.clone();
+        let mut Gs = *G;
         Gs.mul_assign(&*SECP, &proof.s).unwrap();
         PublicKey::from_combination(&*SECP, vec![&Gxc_neg, &Gs]).unwrap()
     };
 
     // Hr = Hs + (Hx * -c) = Hr + Hcx - Hcx
     let Hr = {
-        let mut Hxc_neg = Hx.clone();
+        let mut Hxc_neg = *Hx;
         Hxc_neg.mul_assign(&*SECP, &c_neg).unwrap();
 
-        let mut Hs = H.clone();
+        let mut Hs = *H;
         Hs.mul_assign(&*SECP, &proof.s).unwrap();
         PublicKey::from_combination(&*SECP, vec![&Hxc_neg, &Hs]).unwrap()
     };
