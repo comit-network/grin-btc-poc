@@ -78,8 +78,7 @@ pub struct EncryptedRedeem {
     incomplete_transaction_to_special_output:
         Box<dyn FnOnce(Signature) -> anyhow::Result<Transaction>>,
     special_output: (u64, KeyPair, u64),
-    // TODO: Should be private. It's only public for testing.
-    pub encsig: schnorr::EncryptedSignature,
+    encsig: schnorr::EncryptedSignature,
     R_hat: PublicKey,
 }
 
@@ -148,7 +147,6 @@ impl EncryptedRedeem {
             )];
 
             Box::new(move |excess_sig| {
-                // TODO: normalize_keypairs or something similar to deal with 50/50
                 if !aggsig::verify_single(
                     &*SECP,
                     &excess_sig,

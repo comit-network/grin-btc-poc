@@ -49,7 +49,6 @@ fn main() -> anyhow::Result<()> {
             100_000_000,
             1_000,
             0,
-            // TODO: Use bob_bitcoin_wallet.fund_input instead
             bob_beta_wallet.fund_input(),
             bob_beta_wallet.change_output_address(),
             bob_beta_wallet.refund_output_address(),
