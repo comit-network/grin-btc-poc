@@ -1,8 +1,7 @@
 use crate::{
     bitcoin,
     commit::Commitment,
-    grin,
-    keypair::self,
+    grin, keypair,
     messages::{Message0, Message1, Message2, Message3, Message4},
     setup_parameters::{self, SetupParameters},
 };
@@ -124,7 +123,7 @@ impl Bob1 {
             &self.init.beta,
             &self.alice_PKs_beta,
             &self.SKs_beta.public(),
-        );
+        )?;
 
         let alpha_encrypted_redeem_action = grin::action::EncryptedRedeem::new(
             self.init.alpha,

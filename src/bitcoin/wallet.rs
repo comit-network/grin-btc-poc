@@ -1,6 +1,6 @@
 use crate::{
     bitcoin::{event, Address, Client, OutPoint, Script, Signature, Transaction, TxOut},
-    keypair::{KeyPair, PublicKey, SECP},
+    keypair::{verify_ecdsa, KeyPair, PublicKey, SECP},
     LookFor,
 };
 use bitcoin::{
@@ -132,14 +132,28 @@ impl LookFor for FunderWallet {
     fn look_for(&self, event: Self::Event) -> anyhow::Result<Self::Extract> {
         let transaction = self.get_rawtransaction(&event.txid)?;
 
-        // funder signature located in 3rd position of witness stack
-        let funder_witness = &transaction.input[0].witness[2];
-        // remove last byte which is SIGHASH flag
-        let funder_sig_bytes = &funder_witness[..funder_witness.len() - 1];
+        // the redeem transaction contains 1 input
+        transaction.input[0]
+            .witness
+            .iter()
+            .find_map(|witness| {
+                if witness.len() == 0 {
+                    return None;
+                }
 
-        Signature::from_der(&*SECP, funder_sig_bytes)
-            .map(crate::ecdsa::Signature::from)
-            .map_err(|e| anyhow::anyhow!("failed to find signature in redeem transaction: {}", e))
+                // remove last byte which is SIGHASH flag
+                let sig_bytes = &witness[..witness.len() - 1];
+
+                match Signature::from_der(&*SECP, sig_bytes) {
+                    Ok(sig) if verify_ecdsa(&event.message_hash, &sig, &event.funder_pk) => {
+                        Some(sig.into())
+                    }
+                    _ => None,
+                }
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!("failed to find signature corresponding to redeemer's public key")
+            })
     }
 }
 

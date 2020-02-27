@@ -163,7 +163,7 @@ pub fn recover(
     } else if Gy_macron == Y.negate() {
         Ok(KeyPair::new(y_macron.negate()))
     } else {
-        unreachable!("cannot be triggered")
+        Err(anyhow::anyhow!("recovery key does not match signature"))
     }
 }
 
