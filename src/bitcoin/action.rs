@@ -1,14 +1,15 @@
 use crate::{
     bitcoin::{
+        self,
         transaction::{fund_transaction, redeem_transaction},
         wallet::{signature_into_witness, FunderWallet, RedeemerWallet},
         Client, PKs, SKs, Signature, Transaction,
     },
     ecdsa,
     keypair::KeyPair,
-    setup_parameters, Execute,
+    Execute,
 };
-use bitcoin::{hashes::Hash, util::bip143::SighashComponents, Script};
+use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents, Script};
 use secp256k1zkp::Message;
 
 pub struct Fund {
@@ -40,7 +41,7 @@ pub struct EncryptedRedeem {
 
 impl EncryptedRedeem {
     pub fn new(
-        init: &setup_parameters::Bitcoin,
+        init: &bitcoin::BaseParameters,
         redeemer_SKs: &SKs,
         funder_PKs: &PKs,
         funder_encsig: ecdsa::EncryptedSignature,

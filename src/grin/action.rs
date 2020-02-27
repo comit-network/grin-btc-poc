@@ -2,10 +2,10 @@ use crate::{
     grin::{
         self, compute_excess_pk, compute_excess_sk, compute_offset,
         wallet::{build_input, build_output},
-        PKs, SKs,
+        PKs, RedeemerSecret, SKs,
     },
     keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
-    schnorr, setup_parameters, Execute,
+    schnorr, Execute,
 };
 use anyhow::Context;
 use grin_core::core::{Input, KernelFeatures, Output, OutputFeatures, Transaction, TxKernel};
@@ -84,8 +84,8 @@ pub struct EncryptedRedeem {
 
 impl EncryptedRedeem {
     pub fn new(
-        init: setup_parameters::Grin,
-        secret_init: setup_parameters::GrinRedeemerSecret,
+        init: grin::BaseParameters,
+        secret_init: RedeemerSecret,
         redeemer_SKs: SKs,
         funder_PKs: PKs,
         Y: PublicKey,

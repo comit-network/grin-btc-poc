@@ -1,27 +1,57 @@
 use crate::{
     grin::{
-        action, bulletproof, compute_excess_pk, compute_excess_sk, compute_offset, KernelFeatures,
-        PKs, SKs,
+        self, action, bulletproof, compute_excess_pk, compute_excess_sk, compute_offset,
+        FunderSecret, KernelFeatures, PKs, RedeemerSecret, SKs,
     },
     keypair::{random_secret_key, KeyPair, PublicKey, SECP},
-    schnorr, setup_parameters,
+    schnorr,
 };
 
-pub struct GrinRedeemerSignatures {
+pub struct RedeemerSigs {
     pub s_fund: schnorr::PartialSignature,
     pub s_refund: schnorr::PartialSignature,
     pub s_hat_redeem: schnorr::PartialEncryptedSignature,
 }
 
+// impl Sign for Grin {
+//     type BaseParameters = BaseParameters;
+
+//     type SKs = SKs;
+//     type PKs = PKs;
+
+//     type RedeemerSigs = RedeemerSigs;
+//     type FunderActions = FunderActions;
+//     type EncSig = schnorr::EncryptedSignature;
+
+//     fn redeemer(
+//         init: &Self::BaseParameters,
+
+//         funder_PKs: &Self::PKs,
+//         redeemer_SKs: &Self::SKs,
+//         Y: &PublicKey,
+//     ) -> Self::RedeemerSigs {
+//         unimplemented!()
+//     }
+
+//     fn funder(
+//         init: &Self::BaseParameters,
+//         funder_SKs: &Self::SKs,
+//         redeemer_PKs: &Self::PKs,
+//         Y: &PublicKey,
+//     ) -> (Self::FunderActions, Self::EncSig) {
+//         unimplemented!()
+//     }
+// }
+
 pub fn redeemer(
-    init: &setup_parameters::Grin,
-    secret_init: &setup_parameters::GrinRedeemerSecret,
+    init: &grin::BaseParameters,
+    secret_init: &RedeemerSecret,
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
     Y: &PublicKey,
     bulletproof_round_1_redeemer: &bulletproof::Round1,
     bulletproof_round_1_funder: &bulletproof::Round1,
-) -> anyhow::Result<(GrinRedeemerSignatures, bulletproof::Round2)> {
+) -> anyhow::Result<(RedeemerSigs, bulletproof::Round2)> {
     let (s_fund, bulletproof_round_2_redeemer) = {
         let offset = compute_offset(&funder_PKs.R_fund, &redeemer_SKs.r_fund.public_key)?;
 
@@ -111,7 +141,7 @@ pub fn redeemer(
     };
 
     Ok((
-        GrinRedeemerSignatures {
+        RedeemerSigs {
             s_fund,
             s_refund,
             s_hat_redeem,
@@ -130,26 +160,26 @@ pub enum RedeemerSignatureError {
     Refund,
 }
 
-pub struct GrinFunderActions {
+pub struct FunderActions {
     pub fund: action::Fund,
     pub refund: action::Refund,
 }
 
 pub fn funder(
-    init: &setup_parameters::Grin,
-    secret_init: &setup_parameters::GrinFunderSecret,
+    init: &grin::BaseParameters,
+    secret_init: &FunderSecret,
     funder_SKs: &SKs,
     redeemer_PKs: &PKs,
     Y: &PublicKey,
-    GrinRedeemerSignatures {
+    RedeemerSigs {
         s_fund: s_fund_redeemer,
         s_refund: s_refund_redeemer,
         s_hat_redeem: s_hat_redeem_redeemer,
-    }: GrinRedeemerSignatures,
+    }: RedeemerSigs,
     bulletproof_round_1_redeemer: &bulletproof::Round1,
     bulletproof_round_1_funder: &bulletproof::Round1,
     bulletproof_round_2_redeemer: &bulletproof::Round2,
-) -> anyhow::Result<(GrinFunderActions, schnorr::EncryptedSignature)> {
+) -> anyhow::Result<(FunderActions, schnorr::EncryptedSignature)> {
     let X = PublicKey::from_combination(&*SECP, vec![&redeemer_PKs.X, &funder_SKs.x.public_key])?;
 
     let fund = {
@@ -296,5 +326,5 @@ pub fn funder(
         .map_err(|_| RedeemerSignatureError::Redeem)?
     };
 
-    Ok((GrinFunderActions { fund, refund }, encsign_redeem))
+    Ok((FunderActions { fund, refund }, encsign_redeem))
 }

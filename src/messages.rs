@@ -1,5 +1,4 @@
 use crate::{
-    bitcoin,
     commit::{Commitment, Opening},
     grin,
 };
@@ -11,22 +10,22 @@ pub struct Message0 {
 }
 
 // Sent by Bob
-pub struct Message1 {
-    pub PKs_alpha: grin::PKs,
-    pub PKs_beta: bitcoin::PKs,
+pub struct Message1<A, B> {
+    pub PKs_alpha: A,
+    pub PKs_beta: B,
     pub bulletproof_round_1_bob: grin::bulletproof::Round1,
 }
 
 // Sent by Alice
-pub struct Message2 {
+pub struct Message2<B> {
     pub opening: Opening,
-    pub beta_redeemer_sigs: bitcoin::Signature,
+    pub beta_redeemer_sigs: B,
 }
 
 // Sent by Bob
-pub struct Message3 {
-    pub beta_redeem_encsig: bitcoin::EncryptedSignature,
-    pub alpha_redeemer_sigs: grin::GrinRedeemerSignatures,
+pub struct Message3<A, B> {
+    pub alpha_redeemer_sigs: A,
+    pub beta_redeem_encsig: B,
     // depending on whether Grin is alpha or beta this will be in Message3 or Message4
     pub bulletproof_round_2_bob: grin::bulletproof::Round2,
 }

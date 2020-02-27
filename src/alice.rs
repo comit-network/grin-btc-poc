@@ -1,123 +1,111 @@
 use crate::{
     bitcoin,
     commit::{Commitment, Opening},
-    grin, keypair,
+    grin::{self, FunderSecret},
+    keypair,
     messages::{Message0, Message1, Message2, Message3, Message4},
-    setup_parameters::{self, SetupParameters},
 };
 
-pub struct Alice0 {
-    init: SetupParameters,
-    secret_init_grin: setup_parameters::GrinFunderSecret,
-    SKs_alpha: grin::SKs,
-    SKs_beta: bitcoin::SKs,
-    bulletproof_round_1_alice: grin::bulletproof::Round1,
+pub struct Alice0<AL, BL> {
+    alpha_state: AL,
+    beta_state: BL,
     y: keypair::KeyPair,
 }
 
-impl Alice0 {
+impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
     pub fn new(
-        init: SetupParameters,
-        secret_init_grin: setup_parameters::GrinFunderSecret,
+        base_parameters_grin: grin::BaseParameters,
+        base_parameters_bitcoin: bitcoin::BaseParameters,
+        secret_init_grin: FunderSecret,
     ) -> anyhow::Result<(Self, Message0)> {
-        let (SKs_alpha, bulletproof_round_1_alice) = grin::keygen()?;
-        let SKs_beta = bitcoin::SKs::keygen();
+        let grin_state = grin::alice::AliceFunder0::new(base_parameters_grin, secret_init_grin)?;
+        let bitcoin_state = bitcoin::alice::AliceRedeemer0::new(base_parameters_bitcoin);
+
         let y = keypair::KeyPair::new_random();
 
-        let commitment = Commitment::commit(&SKs_alpha.public(), &SKs_beta.public(), &y.public_key);
+        let commitment = Commitment::commit(
+            &grin_state.common.SKs_self.clone().into(),
+            &bitcoin_state.0.SKs_self.clone().into(),
+            &y.public_key,
+        );
 
         let state = Alice0 {
-            init,
-            secret_init_grin,
-            SKs_alpha,
-            SKs_beta,
+            alpha_state: grin_state.clone(),
+            beta_state: bitcoin_state,
             y,
-            bulletproof_round_1_alice: bulletproof_round_1_alice.clone(),
         };
 
         let message = Message0 {
             commitment,
-            bulletproof_round_1_alice,
+            bulletproof_round_1_alice: grin_state.bulletproof_round_1_self,
         };
 
         Ok((state, message))
     }
 
-    pub fn receive(mut self, mut message: Message1) -> anyhow::Result<(Alice1, Message2)> {
+    pub fn receive(
+        mut self,
+        message: Message1<grin::PKs, bitcoin::PKs>,
+    ) -> anyhow::Result<(
+        Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1>,
+        Message2<bitcoin::Signature>,
+    )> {
         let opening = Opening::new(
-            self.SKs_alpha.public(),
-            self.SKs_beta.public(),
+            self.alpha_state.common.SKs_self.clone().into(),
+            self.beta_state.0.SKs_self.clone().into(),
             self.y.public_key,
         );
 
-        grin::normalize_redeem_keys_alice(
-            &mut self.SKs_alpha.r_redeem,
-            &mut message.PKs_alpha.R_redeem,
+        let grin_state = self.alpha_state.transition(
+            message.PKs_alpha,
             &mut self.y,
+            message.bulletproof_round_1_bob,
         )?;
-
-        let beta_redeemer_sigs =
-            bitcoin::sign::redeemer(&self.init.beta, &self.SKs_beta, &message.PKs_beta);
+        let (bitcoin_state, bitcoin_redeemer_refund_sig) =
+            self.beta_state.transition(message.PKs_beta);
 
         let state = Alice1 {
-            init: self.init,
-            secret_init_grin: self.secret_init_grin,
-            SKs_alpha: self.SKs_alpha,
-            SKs_beta: self.SKs_beta,
-            bob_PKs_alpha: message.PKs_alpha,
-            bob_PKs_beta: message.PKs_beta,
-            bulletproof_round_1_alice: self.bulletproof_round_1_alice,
-            bulletproof_round_1_bob: message.bulletproof_round_1_bob,
             y: self.y,
+            alpha_state: grin_state,
+            beta_state: bitcoin_state,
         };
 
         let message = Message2 {
             opening,
-            beta_redeemer_sigs,
+            beta_redeemer_sigs: bitcoin_redeemer_refund_sig,
         };
 
         Ok((state, message))
     }
 }
 
-pub struct Alice1 {
-    init: SetupParameters,
-    secret_init_grin: setup_parameters::GrinFunderSecret,
-    SKs_alpha: grin::SKs,
-    SKs_beta: bitcoin::SKs,
-    bob_PKs_alpha: grin::PKs,
-    bob_PKs_beta: bitcoin::PKs,
-    bulletproof_round_1_alice: grin::bulletproof::Round1,
-    bulletproof_round_1_bob: grin::bulletproof::Round1,
+pub struct Alice1<AL, BL> {
+    alpha_state: AL,
+    beta_state: BL,
     y: keypair::KeyPair,
 }
 
-impl Alice1 {
-    pub fn receive(self, message: Message3) -> anyhow::Result<(Alice2, Message4)> {
-        let (alpha_actions, alpha_redeem_encsig) = grin::sign::funder(
-            &self.init.alpha,
-            &self.secret_init_grin,
-            &self.SKs_alpha,
-            &self.bob_PKs_alpha,
-            &self.y.public_key,
+impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
+    pub fn receive(
+        self,
+        message: Message3<grin::RedeemerSigs, bitcoin::EncryptedSignature>,
+    ) -> anyhow::Result<(
+        Alice2<grin::AliceFunder2, bitcoin::AliceRedeemer2>,
+        Message4,
+    )> {
+        let (grin_state, alpha_redeem_encsig) = self.alpha_state.transition(
             message.alpha_redeemer_sigs,
-            &self.bulletproof_round_1_bob,
-            &self.bulletproof_round_1_alice,
-            &message.bulletproof_round_2_bob,
+            &self.y,
+            message.bulletproof_round_2_bob,
         )?;
 
-        let beta_encrypted_redeem_action = bitcoin::action::EncryptedRedeem::new(
-            &self.init.beta,
-            &self.SKs_beta,
-            &self.bob_PKs_beta,
-            message.beta_redeem_encsig,
-        );
-        let beta_redeem_action = beta_encrypted_redeem_action.decrypt(&self.y);
+        let bitcoin_state = self
+            .beta_state
+            .transition(message.beta_redeem_encsig, &self.y);
 
         let state = Alice2 {
-            alpha_fund_action: alpha_actions.fund,
-            alpha_refund_action: alpha_actions.refund,
-            beta_redeem_action,
+            alpha_state: grin_state,
+            beta_state: bitcoin_state,
         };
 
         let message = Message4 {
@@ -128,8 +116,7 @@ impl Alice1 {
     }
 }
 
-pub struct Alice2 {
-    pub alpha_fund_action: grin::action::Fund,
-    pub alpha_refund_action: grin::action::Refund,
-    pub beta_redeem_action: bitcoin::action::Redeem,
+pub struct Alice2<AL, BL> {
+    pub alpha_state: AL,
+    pub beta_state: BL,
 }

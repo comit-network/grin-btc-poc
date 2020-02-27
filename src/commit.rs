@@ -1,21 +1,16 @@
-use crate::{bitcoin, grin, keypair};
+use crate::{bitcoin, grin, PublicKey};
 use blake2::{Blake2b, Digest};
-use secp256k1zkp::PublicKey;
 
 pub struct Commitment([u8; 64]);
 
 pub struct Opening {
     PKs_grin: grin::PKs,
     PKs_bitcoin: bitcoin::PKs,
-    Y: keypair::PublicKey,
+    Y: PublicKey,
 }
 
 impl Commitment {
-    pub fn commit(
-        PKs_grin: &grin::PKs,
-        PKs_bitcoin: &bitcoin::PKs,
-        Y: &keypair::PublicKey,
-    ) -> Commitment {
+    pub fn commit(PKs_grin: &grin::PKs, PKs_bitcoin: &bitcoin::PKs, Y: &PublicKey) -> Commitment {
         let mut hasher = Blake2b::new();
 
         hasher.input(PKs_grin.X.0);
@@ -33,7 +28,7 @@ impl Commitment {
 }
 
 impl Opening {
-    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs, Y: keypair::PublicKey) -> Self {
+    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs, Y: PublicKey) -> Self {
         Opening {
             PKs_grin,
             PKs_bitcoin,

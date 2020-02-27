@@ -1,13 +1,14 @@
-use crate::setup_parameters;
+use crate::bitcoin;
 use ::bitcoin::{
-    blockdata::script, hashes::sha256d::Hash, network::constants::Network, Address, OutPoint,
-    Script, Transaction, TxIn, TxOut,
+    blockdata::{opcodes, script},
+    hashes::sha256d::Hash,
+    network::constants::Network,
+    Address, OutPoint, Script, Transaction, TxIn, TxOut,
 };
-use bitcoin::blockdata::opcodes;
 use secp256k1zkp::key::PublicKey;
 
 pub fn fund_transaction(
-    init: &setup_parameters::Bitcoin,
+    init: &bitcoin::BaseParameters,
     redeemer_key: &PublicKey,
     funder_key: &PublicKey,
 ) -> (Transaction, Script) {
@@ -51,7 +52,7 @@ pub fn fund_transaction(
 }
 
 pub fn refund_transaction(
-    init: &setup_parameters::Bitcoin,
+    init: &bitcoin::BaseParameters,
     fund_transaction_id: Hash,
 ) -> Transaction {
     Transaction {
@@ -74,7 +75,7 @@ pub fn refund_transaction(
 }
 
 pub fn redeem_transaction(
-    init: &setup_parameters::Bitcoin,
+    init: &bitcoin::BaseParameters,
     fund_transaction_id: Hash,
 ) -> Transaction {
     Transaction {

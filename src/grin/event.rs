@@ -1,7 +1,6 @@
 use crate::{
-    grin::{compute_excess_pk, compute_offset, PKs},
+    grin::{self, compute_excess_pk, compute_offset, PKs},
     keypair::build_commitment,
-    setup_parameters,
 };
 use secp256k1zkp::pedersen::Commitment;
 
@@ -11,7 +10,7 @@ pub struct Redeem {
 
 impl Redeem {
     pub fn new(
-        init: &setup_parameters::Grin,
+        init: &grin::BaseParameters,
         redeemer_PKs: &PKs,
         funder_PKs: &PKs,
     ) -> anyhow::Result<Self> {

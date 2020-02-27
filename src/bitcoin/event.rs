@@ -1,10 +1,10 @@
 use crate::{
     bitcoin::{
+        self,
         transaction::{fund_transaction, redeem_transaction},
         PKs,
     },
     keypair::PublicKey,
-    setup_parameters,
 };
 use ::bitcoin::{
     hashes::{sha256d, Hash},
@@ -22,7 +22,7 @@ pub struct Redeem {
 
 impl Redeem {
     pub fn new(
-        init: &setup_parameters::Bitcoin,
+        init: &bitcoin::BaseParameters,
         redeemer_PKs: &PKs,
         funder_PKs: &PKs,
     ) -> anyhow::Result<Self> {

@@ -1,12 +1,11 @@
 use crate::{
     bitcoin::{
-        action,
+        self, action,
         transaction::{fund_transaction, redeem_transaction, refund_transaction},
         PKs, SKs,
     },
     ecdsa,
     keypair::{self, PublicKey},
-    setup_parameters,
 };
 use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents};
 use secp256k1zkp::{self, Message};
@@ -14,7 +13,7 @@ use secp256k1zkp::{self, Message};
 // TODO: Remove Y from spec version
 // TODO: Remove redeem signature from output in spec
 pub fn redeemer(
-    init: &setup_parameters::Bitcoin,
+    init: &bitcoin::BaseParameters,
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
 ) -> secp256k1zkp::Signature {
@@ -34,28 +33,28 @@ pub fn redeemer(
     redeemer_SKs.x.sign_ecdsa(&refund_digest)
 }
 
-pub struct BitcoinFunderActions {
+pub struct FunderActions {
     pub fund: action::Fund,
     pub refund: action::Refund,
 }
 
 // TODO: Modify the spec to not pass redeemer's redeem signature to funder
 pub fn funder(
-    init: &setup_parameters::Bitcoin,
+    base_parameters: &bitcoin::BaseParameters,
     funder_SKs: &SKs,
     redeemer_PKs: &PKs,
     Y: &PublicKey,
     redeemer_refund_signature: &secp256k1zkp::Signature,
-) -> anyhow::Result<(BitcoinFunderActions, ecdsa::EncryptedSignature)> {
+) -> anyhow::Result<(FunderActions, ecdsa::EncryptedSignature)> {
     let (fund_transaction, fund_output_script) =
-        fund_transaction(&init, &redeemer_PKs.X, &funder_SKs.x.public_key);
+        fund_transaction(&base_parameters, &redeemer_PKs.X, &funder_SKs.x.public_key);
 
     let fund = action::Fund {
         transaction: fund_transaction.clone(),
     };
 
     let refund = {
-        let refund_transaction = refund_transaction(&init, fund_transaction.txid());
+        let refund_transaction = refund_transaction(&base_parameters, fund_transaction.txid());
 
         let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
             &refund_transaction.input[0],
@@ -81,7 +80,7 @@ pub fn funder(
     };
 
     let encrypted_redeem_signature = {
-        let redeem_transaction = redeem_transaction(&init, fund_transaction.txid());
+        let redeem_transaction = redeem_transaction(&base_parameters, fund_transaction.txid());
         let redeem_digest = SighashComponents::new(&redeem_transaction).sighash_all(
             &redeem_transaction.input[0],
             &fund_output_script,
@@ -91,8 +90,5 @@ pub fn funder(
         ecdsa::encsign(&funder_SKs.x, &Y, &redeem_digest)
     };
 
-    Ok((
-        BitcoinFunderActions { fund, refund },
-        encrypted_redeem_signature,
-    ))
+    Ok((FunderActions { fund, refund }, encrypted_redeem_signature))
 }
