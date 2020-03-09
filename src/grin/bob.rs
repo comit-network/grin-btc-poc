@@ -1,8 +1,12 @@
-use crate::grin::{
-    action, bulletproof, normalize_redeem_keys_bob, BaseParameters, EncryptedSignature, Funder0,
-    Funder1, Funder2, FunderSecret, PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2,
-    RedeemerSecret, RedeemerSigs,
+use crate::{
+    grin::{
+        action, bulletproof, event, normalize_redeem_keys_bob, BaseParameters, EncryptedSignature,
+        Funder0, Funder1, FunderSecret, PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2,
+        RedeemerSecret, RedeemerSigs, SKs,
+    },
+    schnorr::RecoveryKey,
 };
+use std::convert::TryFrom;
 
 #[derive(Clone)]
 pub struct BobFunder0 {
@@ -26,11 +30,74 @@ impl BobFunder0 {
             bulletproof_round_1_other,
         })
     }
+
+    pub fn transition(
+        self,
+        PKs_other: PKs,
+        redeemer_sigs: RedeemerSigs,
+        Y: &PublicKey,
+        bulletproof_round_2_other: bulletproof::Round2,
+    ) -> anyhow::Result<(BobFunder1, EncryptedSignature)> {
+        let state = Funder1 {
+            base_parameters: self.common.base_parameters.clone(),
+            secret_init: self.common.secret_init,
+            SKs_self: self.common.SKs_self.clone(),
+            PKs_other: PKs_other.clone(),
+            bulletproof_round_1_self: self.bulletproof_round_1_self,
+            bulletproof_round_1_other: self.bulletproof_round_1_other,
+        };
+
+        let (state, redeem_encsig) =
+            state.transition(redeemer_sigs, &Y, bulletproof_round_2_other)?;
+
+        let recovery_key = RecoveryKey::try_from(redeem_encsig.clone())?;
+
+        Ok((
+            BobFunder1 {
+                base_parameters: self.common.base_parameters,
+                SKs_self: self.common.SKs_self,
+                PKs_other,
+                fund_action: state.fund_action,
+                refund_action: state.refund_action,
+                recovery_key,
+            },
+            redeem_encsig,
+        ))
+    }
 }
 
-pub struct BobFunder1(pub Funder1);
+pub struct BobFunder1 {
+    base_parameters: BaseParameters,
+    SKs_self: SKs,
+    PKs_other: PKs,
+    fund_action: action::Fund,
+    refund_action: action::Refund,
+    recovery_key: RecoveryKey,
+}
 
-pub struct BobFunder2(pub Funder2);
+impl BobFunder1 {
+    pub fn transition(self) -> anyhow::Result<BobFunder2> {
+        let redeem_event = event::Redeem::new(
+            &self.base_parameters,
+            &self.PKs_other,
+            &self.SKs_self.into(),
+        )?;
+
+        Ok(BobFunder2 {
+            fund_action: self.fund_action,
+            refund_action: self.refund_action,
+            recovery_key: self.recovery_key,
+            redeem_event,
+        })
+    }
+}
+
+pub struct BobFunder2 {
+    pub fund_action: action::Fund,
+    pub refund_action: action::Refund,
+    pub recovery_key: RecoveryKey,
+    pub redeem_event: event::Redeem,
+}
 
 #[derive(Clone)]
 pub struct BobRedeemer0 {

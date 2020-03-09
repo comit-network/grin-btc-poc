@@ -1,7 +1,7 @@
 use crate::{
     grin::{
-        bulletproof, normalize_redeem_keys_alice, BaseParameters, EncryptedSignature, Funder0,
-        Funder1, Funder2, FunderSecret, KeyPair, PKs, Redeemer0, Redeemer1, Redeemer2,
+        action, bulletproof, normalize_redeem_keys_alice, BaseParameters, EncryptedSignature,
+        Funder0, Funder1, Funder2, FunderSecret, KeyPair, PKs, Redeemer0, Redeemer1, Redeemer2,
         RedeemerSecret, RedeemerSigs,
     },
     PublicKey,
@@ -92,7 +92,7 @@ impl AliceRedeemer0 {
         mut PKs_other: PKs,
         mut y: &mut KeyPair,
         bulletproof_round_1_other: bulletproof::Round1,
-    ) -> anyhow::Result<(AliceRedeemer1, RedeemerSigs)> {
+    ) -> anyhow::Result<(AliceRedeemer1, RedeemerSigs, bulletproof::Round2)> {
         normalize_redeem_keys_alice(
             &mut self.common.SKs_self.r_redeem,
             &mut PKs_other.R_redeem,
@@ -112,9 +112,9 @@ impl AliceRedeemer0 {
                 common: state,
                 bulletproof_round_1_self: self.bulletproof_round_1_self,
                 bulletproof_round_1_other,
-                bulletproof_round_2_self,
             },
             redeemer_sigs,
+            bulletproof_round_2_self,
         ))
     }
 }
@@ -123,10 +123,27 @@ pub struct AliceRedeemer1 {
     pub common: Redeemer1,
     pub bulletproof_round_1_self: bulletproof::Round1,
     pub bulletproof_round_1_other: bulletproof::Round1,
-    pub bulletproof_round_2_self: bulletproof::Round2,
 }
 
-pub struct AliceRedeemer2(pub Redeemer2);
+impl AliceRedeemer1 {
+    pub fn transition(
+        self,
+        y: KeyPair,
+        redeem_encsig: EncryptedSignature,
+    ) -> anyhow::Result<AliceRedeemer2> {
+        let Redeemer2 {
+            encrypted_redeem_action,
+        } = self.common.transition(y.public_key, redeem_encsig)?;
+
+        let redeem_action = encrypted_redeem_action.decrypt(&y)?;
+
+        Ok(AliceRedeemer2 { redeem_action })
+    }
+}
+
+pub struct AliceRedeemer2 {
+    pub redeem_action: action::Redeem,
+}
 
 impl Into<Vec<PublicKey>> for AliceFunder0 {
     fn into(self) -> Vec<PublicKey> {

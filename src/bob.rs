@@ -42,6 +42,7 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         Message2 {
             opening,
             beta_redeemer_sigs: alice_bitcoin_refund_signature,
+            ..
         }: Message2<bitcoin::Signature>,
     ) -> anyhow::Result<(
         Bob1<grin::BobRedeemer1, bitcoin::BobFunder1>,
@@ -49,7 +50,7 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
     )> {
         let (alice_PKs_grin, alice_PKs_bitcoin, Y) = opening.open(self.alice_commitment)?;
 
-        let (grin_state, grin_redeemer_sigs, bulletproof_round_1_self) =
+        let (grin_state, grin_redeemer_sigs, bulletproof_round_2_self) =
             self.alpha_state.transition(alice_PKs_grin.try_into()?, Y)?;
         let (bitcoin_state, bitcoin_redeem_encsig) = self.beta_state.transition(
             alice_PKs_bitcoin.try_into()?,
@@ -66,7 +67,7 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         let message = Message3 {
             alpha_redeemer_sigs: grin_redeemer_sigs,
             beta_redeem_encsig: bitcoin_redeem_encsig,
-            bulletproof_round_2_bob: bulletproof_round_1_self,
+            bulletproof_round_2_bob: Some(bulletproof_round_2_self),
         };
 
         Ok((state, message))
@@ -75,8 +76,8 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
 
 impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
     pub fn new(
-        base_parameters_grin: grin::BaseParameters,
         base_parameters_bitcoin: bitcoin::BaseParameters,
+        base_parameters_grin: grin::BaseParameters,
         secret_init_grin: FunderSecret,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<bitcoin::PKs, grin::PKs>)> {
@@ -101,13 +102,37 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         self,
         Message2 {
             opening,
-            beta_redeemer_sigs: alice_bitcoin_refund_signature,
-        }: Message2<bitcoin::Signature>,
+            beta_redeemer_sigs: alice_grin_redeemer_sigs,
+            bulletproof_round_2_alice,
+        }: Message2<grin::RedeemerSigs>,
     ) -> anyhow::Result<(
-        Bob1<grin::BobRedeemer1, bitcoin::BobFunder1>,
-        Message3<grin::RedeemerSigs, bitcoin::EncryptedSignature>,
+        Bob1<bitcoin::BobRedeemer1, grin::BobFunder1>,
+        Message3<bitcoin::Signature, grin::EncryptedSignature>,
     )> {
-        unimplemented!()
+        let (alice_PKs_bitcoin, alice_PKs_grin, Y) = opening.open(self.alice_commitment)?;
+
+        let (bitcoin_state, bitcoin_redeemer_refund_sig) =
+            self.alpha_state.transition(alice_PKs_bitcoin.try_into()?);
+        let (grin_state, grin_redeem_encsig) = self.beta_state.transition(
+            alice_PKs_grin.try_into()?,
+            alice_grin_redeemer_sigs,
+            &Y,
+            bulletproof_round_2_alice.expect("Alice has to send it if she's redeeming Grin"),
+        )?;
+
+        let state = Bob1 {
+            alpha_state: bitcoin_state,
+            beta_state: grin_state,
+            Y,
+        };
+
+        let message = Message3 {
+            alpha_redeemer_sigs: bitcoin_redeemer_refund_sig,
+            beta_redeem_encsig: grin_redeem_encsig,
+            bulletproof_round_2_bob: None,
+        };
+
+        Ok((state, message))
     }
 }
 
@@ -147,7 +172,7 @@ pub struct Bob1<AL, BL> {
 impl Bob1<grin::BobRedeemer1, bitcoin::BobFunder1> {
     pub fn receive(
         self,
-        message: Message4,
+        message: Message4<grin::EncryptedSignature>,
     ) -> anyhow::Result<Bob2<grin::BobRedeemer2, bitcoin::BobFunder2>> {
         let grin_state = self
             .alpha_state
@@ -157,6 +182,24 @@ impl Bob1<grin::BobRedeemer1, bitcoin::BobFunder1> {
         Ok(Bob2 {
             alpha_state: grin_state,
             beta_state: bitcoin_state,
+        })
+    }
+}
+
+impl Bob1<bitcoin::BobRedeemer1, grin::BobFunder1> {
+    pub fn receive(
+        self,
+        message: Message4<bitcoin::EncryptedSignature>,
+    ) -> anyhow::Result<Bob2<bitcoin::BobRedeemer2, grin::BobFunder2>> {
+        // Produce encrypted redeem action
+        let bitcoin_state = self.alpha_state.transition(message.alpha_redeem_encsig);
+
+        // Add grin redeem event to state
+        let grin_state = self.beta_state.transition()?;
+
+        Ok(Bob2 {
+            alpha_state: bitcoin_state,
+            beta_state: grin_state,
         })
     }
 }

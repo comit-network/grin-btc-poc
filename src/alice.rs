@@ -60,6 +60,7 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
             Message2 {
                 opening,
                 beta_redeemer_sigs: bitcoin_redeemer_refund_sig,
+                bulletproof_round_2_alice: None,
             },
         ))
     }
@@ -95,11 +96,12 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
         );
 
         let bitcoin_state = self.alpha_state.transition(message.PKs_alpha);
-        let (grin_state, grin_redeemer_sigs) = self.beta_state.transition(
-            message.PKs_beta,
-            &mut self.y,
-            message.bulletproof_round_1_bob,
-        )?;
+        let (grin_state, grin_redeemer_sigs, bulletproof_round_2_alice) =
+            self.beta_state.transition(
+                message.PKs_beta,
+                &mut self.y,
+                message.bulletproof_round_1_bob,
+            )?;
 
         Ok((
             Alice1 {
@@ -110,6 +112,7 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
             Message2 {
                 opening,
                 beta_redeemer_sigs: grin_redeemer_sigs,
+                bulletproof_round_2_alice: Some(bulletproof_round_2_alice),
             },
         ))
     }
@@ -160,12 +163,14 @@ impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
         message: Message3<grin::RedeemerSigs, bitcoin::EncryptedSignature>,
     ) -> anyhow::Result<(
         Alice2<grin::AliceFunder2, bitcoin::AliceRedeemer2>,
-        Message4,
+        Message4<grin::EncryptedSignature>,
     )> {
         let (grin_state, grin_redeem_encsig) = self.alpha_state.transition(
             message.alpha_redeemer_sigs,
             &self.y,
-            message.bulletproof_round_2_bob,
+            message
+                .bulletproof_round_2_bob
+                .expect("Bob has to send it if he's redeeming Grin"),
         )?;
         let bitcoin_state = self
             .beta_state
@@ -178,6 +183,36 @@ impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
 
         let message = Message4 {
             alpha_redeem_encsig: grin_redeem_encsig,
+        };
+
+        Ok((state, message))
+    }
+}
+
+impl Alice1<bitcoin::AliceFunder1, grin::AliceRedeemer1> {
+    pub fn receive(
+        self,
+        Message3 {
+            alpha_redeemer_sigs: bob_bitcoin_refund_signature,
+            beta_redeem_encsig: grin_redeem_encsig,
+            ..
+        }: Message3<bitcoin::Signature, grin::EncryptedSignature>,
+    ) -> anyhow::Result<(
+        Alice2<bitcoin::AliceFunder2, grin::AliceRedeemer2>,
+        Message4<bitcoin::EncryptedSignature>,
+    )> {
+        let (bitcoin_state, bitcoin_redeem_encsig) = self
+            .alpha_state
+            .transition(bob_bitcoin_refund_signature, &self.y)?;
+        let grin_state = self.beta_state.transition(self.y, grin_redeem_encsig)?;
+
+        let state = Alice2 {
+            alpha_state: bitcoin_state,
+            beta_state: grin_state,
+        };
+
+        let message = Message4 {
+            alpha_redeem_encsig: bitcoin_redeem_encsig,
         };
 
         Ok((state, message))

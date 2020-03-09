@@ -1,7 +1,8 @@
+use crate::bitcoin::sign::FunderActions;
 use crate::{
     bitcoin::{
-        action, BaseParameters, EncryptedSignature, Funder0, Funder1, Funder2, PKs, Redeemer0,
-        Redeemer1, Signature,
+        action, BaseParameters, EncryptedSignature, Funder0, Funder1, PKs, Redeemer0, Redeemer1,
+        Signature,
     },
     KeyPair, PublicKey,
 };
@@ -22,7 +23,29 @@ impl AliceFunder0 {
 
 pub struct AliceFunder1(pub Funder1);
 
-pub struct AliceFunder2(pub Funder2);
+impl AliceFunder1 {
+    pub fn transition(
+        self,
+        redeemer_refund_sig: Signature,
+        y: &KeyPair,
+    ) -> anyhow::Result<(AliceFunder2, EncryptedSignature)> {
+        let (FunderActions { fund, refund }, redeem_encsig) =
+            self.0.sign(&y.public_key, redeemer_refund_sig)?;
+
+        Ok((
+            AliceFunder2 {
+                fund_action: fund,
+                refund_action: refund,
+            },
+            redeem_encsig,
+        ))
+    }
+}
+
+pub struct AliceFunder2 {
+    pub fund_action: action::Fund,
+    pub refund_action: action::Refund,
+}
 
 #[derive(Clone)]
 pub struct AliceRedeemer0(pub Redeemer0);
@@ -33,8 +56,7 @@ impl AliceRedeemer0 {
     }
 
     pub fn transition(self, PKs_other: PKs) -> (AliceRedeemer1, Signature) {
-        let (state, redeemer_refund_sig) =
-            Redeemer1::new(self.0.base_parameters, self.0.SKs_self, PKs_other);
+        let (state, redeemer_refund_sig) = self.0.transition(PKs_other);
 
         (AliceRedeemer1(state), redeemer_refund_sig)
     }

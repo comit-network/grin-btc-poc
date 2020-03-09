@@ -1,7 +1,7 @@
 use crate::{
     bitcoin::{
         action, event, sign::FunderActions, BaseParameters, EncryptedSignature, Funder0, Funder1,
-        PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2, Signature,
+        PKs, PublicKey, Redeemer0, Redeemer1, Signature,
     },
     ecdsa::{self, RecoveryKey},
 };
@@ -76,11 +76,34 @@ impl BobRedeemer0 {
     pub fn new(base_parameters: BaseParameters) -> Self {
         Self(Redeemer0::new(base_parameters))
     }
+
+    pub fn transition(self, PKs_other: PKs) -> (BobRedeemer1, Signature) {
+        let (state, redeemer_refund_sig) = self.0.transition(PKs_other);
+
+        (BobRedeemer1(state), redeemer_refund_sig)
+    }
 }
 
 pub struct BobRedeemer1(pub Redeemer1);
 
-pub struct BobRedeemer2(pub Redeemer2);
+impl BobRedeemer1 {
+    pub fn transition(self, redeem_encsig: EncryptedSignature) -> BobRedeemer2 {
+        let encrypted_redeem_action = action::EncryptedRedeem::new(
+            &self.0.base_parameters,
+            &self.0.SKs_self,
+            &self.0.PKs_other,
+            redeem_encsig,
+        );
+
+        BobRedeemer2 {
+            encrypted_redeem_action,
+        }
+    }
+}
+
+pub struct BobRedeemer2 {
+    pub encrypted_redeem_action: action::EncryptedRedeem,
+}
 
 impl Into<PKs> for BobFunder0 {
     fn into(self) -> PKs {

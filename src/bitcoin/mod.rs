@@ -100,6 +100,18 @@ impl Redeemer0 {
             SKs_self,
         }
     }
+
+    pub fn transition(self, PKs_other: PKs) -> (Redeemer1, Signature) {
+        let redeemer_refund_sig = sign::redeemer(&self.base_parameters, &self.SKs_self, &PKs_other);
+
+        let state = Redeemer1 {
+            base_parameters: self.base_parameters,
+            SKs_self: self.SKs_self,
+            PKs_other,
+        };
+
+        (state, redeemer_refund_sig)
+    }
 }
 
 #[derive(Clone)]
@@ -107,24 +119,6 @@ pub struct Redeemer1 {
     pub base_parameters: BaseParameters,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
-}
-
-impl Redeemer1 {
-    pub fn new(
-        base_parameters: BaseParameters,
-        SKs_self: SKs,
-        PKs_other: PKs,
-    ) -> (Self, Signature) {
-        let redeemer_refund_sig = sign::redeemer(&base_parameters, &SKs_self, &PKs_other);
-
-        let state = Self {
-            base_parameters,
-            SKs_self,
-            PKs_other,
-        };
-
-        (state, redeemer_refund_sig)
-    }
 }
 
 pub struct Redeemer2 {
