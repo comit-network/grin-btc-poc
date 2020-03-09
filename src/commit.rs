@@ -1,23 +1,30 @@
-use crate::{bitcoin, grin, PublicKey};
+use crate::PublicKey;
 use blake2::{Blake2b, Digest};
 
 pub struct Commitment([u8; 64]);
 
 pub struct Opening {
-    PKs_grin: grin::PKs,
-    PKs_bitcoin: bitcoin::PKs,
+    PKs_alpha: Vec<PublicKey>,
+    PKs_beta: Vec<PublicKey>,
     Y: PublicKey,
 }
 
 impl Commitment {
-    pub fn commit(PKs_grin: &grin::PKs, PKs_bitcoin: &bitcoin::PKs, Y: &PublicKey) -> Commitment {
+    pub fn commit(
+        PKs_alpha: Vec<PublicKey>,
+        PKs_beta: Vec<PublicKey>,
+        Y: &PublicKey,
+    ) -> Commitment {
         let mut hasher = Blake2b::new();
 
-        hasher.input(PKs_grin.X.0);
-        hasher.input(PKs_grin.R_fund.0);
-        hasher.input(PKs_grin.R_redeem.0);
-        hasher.input(PKs_grin.R_refund.0);
-        hasher.input(PKs_bitcoin.X.0);
+        for pk in PKs_alpha.iter() {
+            hasher.input(pk.0);
+        }
+
+        for pk in PKs_beta.iter() {
+            hasher.input(pk.0);
+        }
+
         hasher.input(Y.0);
 
         let mut commitment = [0u8; 64];
@@ -28,10 +35,10 @@ impl Commitment {
 }
 
 impl Opening {
-    pub fn new(PKs_grin: grin::PKs, PKs_bitcoin: bitcoin::PKs, Y: PublicKey) -> Self {
+    pub fn new(PKs_alpha: Vec<PublicKey>, PKs_beta: Vec<PublicKey>, Y: PublicKey) -> Self {
         Opening {
-            PKs_grin,
-            PKs_bitcoin,
+            PKs_alpha,
+            PKs_beta,
             Y,
         }
     }
@@ -39,11 +46,12 @@ impl Opening {
     pub fn open(
         self,
         commitment: Commitment,
-    ) -> anyhow::Result<(grin::PKs, bitcoin::PKs, PublicKey)> {
-        let self_commitment = Commitment::commit(&self.PKs_grin, &self.PKs_bitcoin, &self.Y);
+    ) -> anyhow::Result<(Vec<PublicKey>, Vec<PublicKey>, PublicKey)> {
+        let self_commitment =
+            Commitment::commit(self.PKs_alpha.clone(), self.PKs_beta.clone(), &self.Y);
 
         if commitment.0[..] == self_commitment.0[..] {
-            Ok((self.PKs_grin, self.PKs_bitcoin, self.Y))
+            Ok((self.PKs_alpha, self.PKs_beta, self.Y))
         } else {
             Err(anyhow::anyhow!("Opening does not match commitment"))
         }

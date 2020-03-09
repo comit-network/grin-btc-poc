@@ -1,8 +1,12 @@
-use crate::grin::{
-    bulletproof, normalize_redeem_keys_alice, BaseParameters, EncryptedSignature, Funder0, Funder1,
-    Funder2, FunderSecret, KeyPair, PKs, Redeemer0, Redeemer1, Redeemer2, RedeemerSecret,
-    RedeemerSigs,
+use crate::{
+    grin::{
+        bulletproof, normalize_redeem_keys_alice, BaseParameters, EncryptedSignature, Funder0,
+        Funder1, Funder2, FunderSecret, KeyPair, PKs, Redeemer0, Redeemer1, Redeemer2,
+        RedeemerSecret, RedeemerSigs,
+    },
+    PublicKey,
 };
+use std::convert::TryInto;
 
 #[derive(Clone)]
 pub struct AliceFunder0 {
@@ -63,6 +67,7 @@ impl AliceFunder1 {
 
 pub struct AliceFunder2(pub Funder2);
 
+#[derive(Clone)]
 pub struct AliceRedeemer0 {
     pub common: Redeemer0,
     pub bulletproof_round_1_self: bulletproof::Round1,
@@ -81,8 +86,70 @@ impl AliceRedeemer0 {
             bulletproof_round_1_self,
         })
     }
+
+    pub fn transition(
+        mut self,
+        mut PKs_other: PKs,
+        mut y: &mut KeyPair,
+        bulletproof_round_1_other: bulletproof::Round1,
+    ) -> anyhow::Result<(AliceRedeemer1, RedeemerSigs)> {
+        normalize_redeem_keys_alice(
+            &mut self.common.SKs_self.r_redeem,
+            &mut PKs_other.R_redeem,
+            &mut y,
+        )?;
+
+        let (state, redeemer_sigs, bulletproof_round_2_self) = Redeemer1::new(
+            self.common,
+            self.bulletproof_round_1_self.clone(),
+            bulletproof_round_1_other.clone(),
+            PKs_other,
+            y.public_key,
+        )?;
+
+        Ok((
+            AliceRedeemer1 {
+                common: state,
+                bulletproof_round_1_self: self.bulletproof_round_1_self,
+                bulletproof_round_1_other,
+                bulletproof_round_2_self,
+            },
+            redeemer_sigs,
+        ))
+    }
 }
 
-pub struct AliceRedeemer1(pub Redeemer1);
+pub struct AliceRedeemer1 {
+    pub common: Redeemer1,
+    pub bulletproof_round_1_self: bulletproof::Round1,
+    pub bulletproof_round_1_other: bulletproof::Round1,
+    pub bulletproof_round_2_self: bulletproof::Round2,
+}
 
 pub struct AliceRedeemer2(pub Redeemer2);
+
+impl Into<Vec<PublicKey>> for AliceFunder0 {
+    fn into(self) -> Vec<PublicKey> {
+        let PKs: PKs = self.common.SKs_self.into();
+        vec![PKs.X, PKs.R_fund, PKs.R_redeem, PKs.R_refund]
+    }
+}
+
+impl Into<Vec<PublicKey>> for AliceRedeemer0 {
+    fn into(self) -> Vec<PublicKey> {
+        let PKs: PKs = self.common.SKs_self.into();
+        vec![PKs.X, PKs.R_fund, PKs.R_redeem, PKs.R_refund]
+    }
+}
+
+impl TryInto<PKs> for Vec<PublicKey> {
+    type Error = anyhow::Error;
+    fn try_into(self) -> anyhow::Result<PKs> {
+        Ok(PKs {
+            X: self[0],
+            R_fund: self[1],
+            R_redeem: self[2],
+            R_refund: self[3],
+        })
+    }
+}

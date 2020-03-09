@@ -4,6 +4,7 @@ use crate::grin::{
     RedeemerSecret, RedeemerSigs,
 };
 
+#[derive(Clone)]
 pub struct BobFunder0 {
     pub common: Funder0,
     pub bulletproof_round_1_self: bulletproof::Round1,
@@ -31,6 +32,7 @@ pub struct BobFunder1(pub Funder1);
 
 pub struct BobFunder2(pub Funder2);
 
+#[derive(Clone)]
 pub struct BobRedeemer0 {
     pub common: Redeemer0,
     pub bulletproof_round_1_self: bulletproof::Round1,
@@ -96,4 +98,16 @@ impl BobRedeemer1 {
 
 pub struct BobRedeemer2 {
     pub encrypted_redeem_action: action::EncryptedRedeem,
+}
+
+impl Into<PKs> for BobFunder0 {
+    fn into(self) -> PKs {
+        self.common.SKs_self.into()
+    }
+}
+
+impl Into<PKs> for BobRedeemer0 {
+    fn into(self) -> PKs {
+        self.common.SKs_self.into()
+    }
 }

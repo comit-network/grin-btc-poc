@@ -1,10 +1,11 @@
 use crate::{
     bitcoin,
     commit::Commitment,
-    grin::{self, RedeemerSecret},
+    grin::{self, bulletproof, FunderSecret, RedeemerSecret},
     keypair,
     messages::{Message0, Message1, Message2, Message3, Message4},
 };
+use std::convert::TryInto;
 
 pub struct Bob0<AL, BL> {
     alpha_state: AL,
@@ -28,19 +29,12 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         )?;
         let bitcoin_state = bitcoin::bob::BobFunder0::new(base_parameters_bitcoin);
 
-        let message = Message1 {
-            PKs_alpha: grin_state.common.SKs_self.clone().into(),
-            PKs_beta: bitcoin_state.0.SKs_self.clone().into(),
-            bulletproof_round_1_bob: grin_state.bulletproof_round_1_self.clone(),
-        };
-
-        let state = Bob0 {
-            alpha_state: grin_state,
-            beta_state: bitcoin_state,
+        Ok(Bob0::state_and_message(
+            grin_state.clone(),
+            bitcoin_state,
             alice_commitment,
-        };
-
-        Ok((state, message))
+            grin_state.bulletproof_round_1_self,
+        ))
     }
 
     pub fn receive(
@@ -56,10 +50,12 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         let (alice_PKs_grin, alice_PKs_bitcoin, Y) = opening.open(self.alice_commitment)?;
 
         let (grin_state, grin_redeemer_sigs, bulletproof_round_1_self) =
-            self.alpha_state.transition(alice_PKs_grin, Y)?;
-        let (bitcoin_state, bitcoin_redeem_encsig) =
-            self.beta_state
-                .transition(alice_PKs_bitcoin, alice_bitcoin_refund_signature, &Y)?;
+            self.alpha_state.transition(alice_PKs_grin.try_into()?, Y)?;
+        let (bitcoin_state, bitcoin_redeem_encsig) = self.beta_state.transition(
+            alice_PKs_bitcoin.try_into()?,
+            alice_bitcoin_refund_signature,
+            &Y,
+        )?;
 
         let state = Bob1 {
             alpha_state: grin_state,
@@ -74,6 +70,71 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         };
 
         Ok((state, message))
+    }
+}
+
+impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
+    pub fn new(
+        base_parameters_grin: grin::BaseParameters,
+        base_parameters_bitcoin: bitcoin::BaseParameters,
+        secret_init_grin: FunderSecret,
+        message: Message0,
+    ) -> anyhow::Result<(Self, Message1<bitcoin::PKs, grin::PKs>)> {
+        let alice_commitment = message.commitment;
+
+        let bitcoin_state = bitcoin::bob::BobRedeemer0::new(base_parameters_bitcoin);
+        let grin_state = grin::bob::BobFunder0::new(
+            base_parameters_grin,
+            secret_init_grin,
+            message.bulletproof_round_1_alice,
+        )?;
+
+        Ok(Bob0::state_and_message(
+            bitcoin_state,
+            grin_state.clone(),
+            alice_commitment,
+            grin_state.bulletproof_round_1_self,
+        ))
+    }
+
+    pub fn receive(
+        self,
+        Message2 {
+            opening,
+            beta_redeemer_sigs: alice_bitcoin_refund_signature,
+        }: Message2<bitcoin::Signature>,
+    ) -> anyhow::Result<(
+        Bob1<grin::BobRedeemer1, bitcoin::BobFunder1>,
+        Message3<grin::RedeemerSigs, bitcoin::EncryptedSignature>,
+    )> {
+        unimplemented!()
+    }
+}
+
+impl<A, B> Bob0<A, B> {
+    pub fn state_and_message<APKs, BPKs>(
+        alpha_state: A,
+        beta_state: B,
+        alice_commitment: Commitment,
+        bulletproof_round_1_bob: bulletproof::Round1,
+    ) -> (Self, Message1<APKs, BPKs>)
+    where
+        A: Into<APKs> + Clone,
+        B: Into<BPKs> + Clone,
+    {
+        let state = Bob0 {
+            alpha_state: alpha_state.clone(),
+            beta_state: beta_state.clone(),
+            alice_commitment,
+        };
+
+        let message = Message1 {
+            PKs_alpha: alpha_state.into(),
+            PKs_beta: beta_state.into(),
+            bulletproof_round_1_bob,
+        };
+
+        (state, message)
     }
 }
 
@@ -103,9 +164,4 @@ impl Bob1<grin::BobRedeemer1, bitcoin::BobFunder1> {
 pub struct Bob2<AL, BL> {
     pub alpha_state: AL,
     pub beta_state: BL,
-    /* pub beta_fund_action: bitcoin::action::Fund,
-     * pub beta_refund_action: bitcoin::action::Refund,
-     * pub alpha_encrypted_redeem_action: grin::action::EncryptedRedeem,
-     * pub beta_recovery_key: crate::ecdsa::RecoveryKey,
-     * pub beta_redeem_event: bitcoin::event::Redeem, */
 }

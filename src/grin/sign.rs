@@ -13,36 +13,6 @@ pub struct RedeemerSigs {
     pub s_hat_redeem: schnorr::PartialEncryptedSignature,
 }
 
-// impl Sign for Grin {
-//     type BaseParameters = BaseParameters;
-
-//     type SKs = SKs;
-//     type PKs = PKs;
-
-//     type RedeemerSigs = RedeemerSigs;
-//     type FunderActions = FunderActions;
-//     type EncSig = schnorr::EncryptedSignature;
-
-//     fn redeemer(
-//         init: &Self::BaseParameters,
-
-//         funder_PKs: &Self::PKs,
-//         redeemer_SKs: &Self::SKs,
-//         Y: &PublicKey,
-//     ) -> Self::RedeemerSigs {
-//         unimplemented!()
-//     }
-
-//     fn funder(
-//         init: &Self::BaseParameters,
-//         funder_SKs: &Self::SKs,
-//         redeemer_PKs: &Self::PKs,
-//         Y: &PublicKey,
-//     ) -> (Self::FunderActions, Self::EncSig) {
-//         unimplemented!()
-//     }
-// }
-
 pub fn redeemer(
     init: &grin::BaseParameters,
     secret_init: &RedeemerSecret,

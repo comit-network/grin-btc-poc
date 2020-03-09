@@ -4,7 +4,7 @@ use crate::{
 };
 use blake2::{Blake2b, Digest};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SKs {
     pub x: KeyPair,
 }
@@ -17,6 +17,7 @@ impl Into<PKs> for SKs {
     }
 }
 
+#[derive(Clone)]
 pub struct PKs {
     pub X: PublicKey,
 }

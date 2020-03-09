@@ -30,6 +30,7 @@ pub use client::Client;
 pub use node::{Node, Wallets};
 pub use secp256k1zkp::Signature;
 
+#[derive(Clone)]
 pub struct Funder0 {
     pub base_parameters: BaseParameters,
     pub SKs_self: SKs,
@@ -46,38 +47,36 @@ impl Funder0 {
     }
 }
 
+#[derive(Clone)]
 pub struct Funder1 {
     pub base_parameters: BaseParameters,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
-    pub fund_action: action::Fund,
-    pub refund_action: action::Refund,
 }
 
 impl Funder1 {
-    pub fn new(
-        prev_state: Funder0,
-        PKs_other: PKs,
+    pub fn new(prev_state: Funder0, PKs_other: PKs) -> Self {
+        Funder1 {
+            base_parameters: prev_state.base_parameters,
+            SKs_self: prev_state.SKs_self,
+            PKs_other,
+        }
+    }
+
+    pub fn sign(
+        self,
         Y: &PublicKey,
         redeemer_refund_sig: Signature,
-    ) -> anyhow::Result<(Funder1, EncryptedSignature)> {
-        let (FunderActions { fund, refund }, redeem_encsig) = sign::funder(
-            &prev_state.base_parameters,
-            &prev_state.SKs_self,
-            &PKs_other,
+    ) -> anyhow::Result<(FunderActions, EncryptedSignature)> {
+        let (funder_actions, redeem_encsig) = sign::funder(
+            &self.base_parameters,
+            &self.SKs_self,
+            &self.PKs_other,
             &Y,
             &redeemer_refund_sig,
         )?;
 
-        let state = Funder1 {
-            base_parameters: prev_state.base_parameters,
-            SKs_self: prev_state.SKs_self,
-            PKs_other,
-            fund_action: fund,
-            refund_action: refund,
-        };
-
-        Ok((state, redeem_encsig))
+        Ok((funder_actions, redeem_encsig))
     }
 }
 
@@ -86,6 +85,7 @@ pub struct Funder2 {
     pub refund_action: action::Refund,
 }
 
+#[derive(Clone)]
 pub struct Redeemer0 {
     pub base_parameters: BaseParameters,
     pub SKs_self: SKs,
@@ -102,6 +102,7 @@ impl Redeemer0 {
     }
 }
 
+#[derive(Clone)]
 pub struct Redeemer1 {
     pub base_parameters: BaseParameters,
     pub SKs_self: SKs,

@@ -3,14 +3,20 @@ use crate::{
         action, BaseParameters, EncryptedSignature, Funder0, Funder1, Funder2, PKs, Redeemer0,
         Redeemer1, Signature,
     },
-    keypair::KeyPair,
+    KeyPair, PublicKey,
 };
+use std::convert::TryInto;
 
+#[derive(Clone)]
 pub struct AliceFunder0(pub Funder0);
 
 impl AliceFunder0 {
     pub fn new(base_parameters: BaseParameters) -> Self {
         Self(Funder0::new(base_parameters))
+    }
+
+    pub fn transition(self, PKs_other: PKs) -> AliceFunder1 {
+        AliceFunder1(Funder1::new(self.0, PKs_other))
     }
 }
 
@@ -18,6 +24,7 @@ pub struct AliceFunder1(pub Funder1);
 
 pub struct AliceFunder2(pub Funder2);
 
+#[derive(Clone)]
 pub struct AliceRedeemer0(pub Redeemer0);
 
 impl AliceRedeemer0 {
@@ -33,6 +40,7 @@ impl AliceRedeemer0 {
     }
 }
 
+#[derive(Clone)]
 pub struct AliceRedeemer1(pub Redeemer1);
 
 impl AliceRedeemer1 {
@@ -51,4 +59,25 @@ impl AliceRedeemer1 {
 
 pub struct AliceRedeemer2 {
     pub redeem_action: action::Redeem,
+}
+
+impl Into<Vec<PublicKey>> for AliceFunder0 {
+    fn into(self) -> Vec<PublicKey> {
+        let PKs: PKs = self.0.SKs_self.into();
+        vec![PKs.X]
+    }
+}
+
+impl Into<Vec<PublicKey>> for AliceRedeemer0 {
+    fn into(self) -> Vec<PublicKey> {
+        let PKs: PKs = self.0.SKs_self.into();
+        vec![PKs.X]
+    }
+}
+
+impl TryInto<PKs> for Vec<PublicKey> {
+    type Error = anyhow::Error;
+    fn try_into(self) -> anyhow::Result<PKs> {
+        Ok(PKs { X: self[0] })
+    }
 }

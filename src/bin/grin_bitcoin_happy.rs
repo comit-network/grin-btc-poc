@@ -49,13 +49,13 @@ fn main() -> anyhow::Result<()> {
     )
     .expect("cannot fail");
 
-    let (alice0, message0) = Alice0::new(
+    let (alice0, message0) = Alice0::<grin::AliceFunder0, bitcoin::AliceRedeemer0>::new(
         base_parameters_grin.clone(),
         base_parameters_bitcoin.clone(),
         grin_funder_secret_init,
     )?;
 
-    let (bob0, message1) = Bob0::new(
+    let (bob0, message1) = Bob0::<grin::BobRedeemer0, bitcoin::BobFunder0>::new(
         base_parameters_grin.clone(),
         base_parameters_bitcoin.clone(),
         grin_redeemer_secret_init,

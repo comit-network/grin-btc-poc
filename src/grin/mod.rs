@@ -92,6 +92,7 @@ pub struct Funder2 {
     pub refund_action: action::Refund,
 }
 
+#[derive(Clone)]
 pub struct Redeemer0 {
     pub base_parameters: BaseParameters,
     pub secret_init: RedeemerSecret,
