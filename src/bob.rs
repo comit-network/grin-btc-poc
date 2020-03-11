@@ -46,7 +46,7 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         }: Message2<bitcoin::Signature>,
     ) -> anyhow::Result<(
         Bob1<grin::BobRedeemer1, bitcoin::BobFunder1>,
-        Message3<grin::RedeemerSigs, bitcoin::EncryptedSignature>,
+        Message3<(grin::RedeemerSigs, grin::bulletproof::Round2), bitcoin::EncryptedSignature>,
     )> {
         let (alice_PKs_grin, alice_PKs_bitcoin, Y) = opening.open(self.alice_commitment)?;
 
@@ -65,9 +65,8 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         };
 
         let message = Message3 {
-            alpha_redeemer_sigs: grin_redeemer_sigs,
+            alpha_redeemer_sigs: (grin_redeemer_sigs, bulletproof_round_2_self),
             beta_redeem_encsig: bitcoin_redeem_encsig,
-            bulletproof_round_2_bob: Some(bulletproof_round_2_self),
         };
 
         Ok((state, message))
@@ -103,8 +102,7 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         Message2 {
             opening,
             beta_redeemer_sigs: alice_grin_redeemer_sigs,
-            bulletproof_round_2_alice,
-        }: Message2<grin::RedeemerSigs>,
+        }: Message2<(grin::RedeemerSigs, bulletproof::Round2)>,
     ) -> anyhow::Result<(
         Bob1<bitcoin::BobRedeemer1, grin::BobFunder1>,
         Message3<bitcoin::Signature, grin::EncryptedSignature>,
@@ -115,9 +113,9 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
             self.alpha_state.transition(alice_PKs_bitcoin.try_into()?);
         let (grin_state, grin_redeem_encsig) = self.beta_state.transition(
             alice_PKs_grin.try_into()?,
-            alice_grin_redeemer_sigs,
+            alice_grin_redeemer_sigs.0,
             &Y,
-            bulletproof_round_2_alice.expect("Alice has to send it if she's redeeming Grin"),
+            alice_grin_redeemer_sigs.1,
         )?;
 
         let state = Bob1 {
@@ -129,7 +127,6 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         let message = Message3 {
             alpha_redeemer_sigs: bitcoin_redeemer_refund_sig,
             beta_redeem_encsig: grin_redeem_encsig,
-            bulletproof_round_2_bob: None,
         };
 
         Ok((state, message))

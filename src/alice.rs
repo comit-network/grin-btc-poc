@@ -5,6 +5,7 @@ use crate::{
     messages::{Message0, Message1, Message2, Message3, Message4},
     PublicKey,
 };
+use grin::bulletproof;
 
 pub struct Alice0<AL, BL> {
     alpha_state: AL,
@@ -60,7 +61,6 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
             Message2 {
                 opening,
                 beta_redeemer_sigs: bitcoin_redeemer_refund_sig,
-                bulletproof_round_2_alice: None,
             },
         ))
     }
@@ -87,7 +87,7 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
         message: Message1<bitcoin::PKs, grin::PKs>,
     ) -> anyhow::Result<(
         Alice1<bitcoin::AliceFunder1, grin::AliceRedeemer1>,
-        Message2<grin::RedeemerSigs>,
+        Message2<(grin::RedeemerSigs, grin::bulletproof::Round2)>,
     )> {
         let opening = Opening::new(
             self.alpha_state.clone().into(),
@@ -111,8 +111,7 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
             },
             Message2 {
                 opening,
-                beta_redeemer_sigs: grin_redeemer_sigs,
-                bulletproof_round_2_alice: Some(bulletproof_round_2_alice),
+                beta_redeemer_sigs: (grin_redeemer_sigs, bulletproof_round_2_alice),
             },
         ))
     }
@@ -160,17 +159,15 @@ pub struct Alice1<AL, BL> {
 impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
     pub fn receive(
         self,
-        message: Message3<grin::RedeemerSigs, bitcoin::EncryptedSignature>,
+        message: Message3<(grin::RedeemerSigs, bulletproof::Round2), bitcoin::EncryptedSignature>,
     ) -> anyhow::Result<(
         Alice2<grin::AliceFunder2, bitcoin::AliceRedeemer2>,
         Message4<grin::EncryptedSignature>,
     )> {
         let (grin_state, grin_redeem_encsig) = self.alpha_state.transition(
-            message.alpha_redeemer_sigs,
+            message.alpha_redeemer_sigs.0,
             &self.y,
-            message
-                .bulletproof_round_2_bob
-                .expect("Bob has to send it if he's redeeming Grin"),
+            message.alpha_redeemer_sigs.1,
         )?;
         let bitcoin_state = self
             .beta_state
