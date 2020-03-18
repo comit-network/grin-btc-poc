@@ -22,8 +22,6 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         outputs_bitcoin: bitcoin::WalletOutputs,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<grin::PKs, bitcoin::PKs>)> {
-        let alice_commitment = message.commitment;
-
         let grin_state = grin::bob::BobRedeemer0::new(
             offer_grin,
             outputs_grin,
@@ -32,11 +30,17 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         )?;
         let bitcoin_state = bitcoin::bob::BobFunder0::new(offer_bitcoin, outputs_bitcoin);
 
-        Ok(Bob0::state_and_message(
-            grin_state.clone(),
-            bitcoin_state,
-            alice_commitment,
-            grin_state.bulletproof_round_1_self,
+        Ok((
+            Bob0 {
+                alpha_state: grin_state.clone(),
+                beta_state: bitcoin_state.clone(),
+                alice_commitment: message.commitment,
+            },
+            Message1 {
+                PKs_alpha: grin_state.clone().into(),
+                PKs_beta: bitcoin_state.into(),
+                bulletproof_round_1_bob: grin_state.bulletproof_round_1_self,
+            },
         ))
     }
 
@@ -86,8 +90,6 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         output_keypairs_grin_funder: grin::SpecialOutputKeyPairsFunder,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<bitcoin::PKs, grin::PKs>)> {
-        let alice_commitment = message.commitment;
-
         let bitcoin_state = bitcoin::bob::BobRedeemer0::new(offer_bitcoin, outputs_bitcoin);
         let grin_state = grin::bob::BobFunder0::new(
             offer_grin,
@@ -96,11 +98,17 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
             message.bulletproof_round_1_alice,
         )?;
 
-        Ok(Bob0::state_and_message(
-            bitcoin_state,
-            grin_state.clone(),
-            alice_commitment,
-            grin_state.bulletproof_round_1_self,
+        Ok((
+            Bob0 {
+                alpha_state: bitcoin_state.clone(),
+                beta_state: grin_state.clone(),
+                alice_commitment: message.commitment,
+            },
+            Message1 {
+                PKs_alpha: bitcoin_state.into(),
+                PKs_beta: grin_state.clone().into(),
+                bulletproof_round_1_bob: grin_state.bulletproof_round_1_self,
+            },
         ))
     }
 
@@ -140,33 +148,6 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
     }
 }
 
-impl<A, B> Bob0<A, B> {
-    pub fn state_and_message<APKs, BPKs>(
-        alpha_state: A,
-        beta_state: B,
-        alice_commitment: Commitment,
-        bulletproof_round_1_bob: bulletproof::Round1,
-    ) -> (Self, Message1<APKs, BPKs>)
-    where
-        A: Into<APKs> + Clone,
-        B: Into<BPKs> + Clone,
-    {
-        let state = Bob0 {
-            alpha_state: alpha_state.clone(),
-            beta_state: beta_state.clone(),
-            alice_commitment,
-        };
-
-        let message = Message1 {
-            PKs_alpha: alpha_state.into(),
-            PKs_beta: beta_state.into(),
-            bulletproof_round_1_bob,
-        };
-
-        (state, message)
-    }
-}
-
 pub struct Bob1<AL, BL> {
     alpha_state: AL,
     beta_state: BL,
@@ -195,10 +176,7 @@ impl Bob1<bitcoin::BobRedeemer1, grin::BobFunder1> {
         self,
         message: Message4<bitcoin::EncryptedSignature>,
     ) -> anyhow::Result<Bob2<bitcoin::BobRedeemer2, grin::BobFunder2>> {
-        // Produce encrypted redeem action
         let bitcoin_state = self.alpha_state.transition(message.alpha_redeem_encsig)?;
-
-        // Add grin redeem event to state
         let grin_state = self.beta_state.transition()?;
 
         Ok(Bob2 {
