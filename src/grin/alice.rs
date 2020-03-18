@@ -1,8 +1,8 @@
 use crate::{
     grin::{
         action, bulletproof, normalize_redeem_keys_alice, EncryptedSignature, Funder0, Funder1,
-        Funder2, FunderSecret, KeyPair, Offer, PKs, Redeemer0, Redeemer1, Redeemer2,
-        RedeemerSecret, RedeemerSigs, SpecialOutputs,
+        Funder2, KeyPair, Offer, PKs, Redeemer0, Redeemer1, Redeemer2, RedeemerSigs,
+        SpecialOutputKeyPairsFunder, SpecialOutputKeyPairsRedeemer, SpecialOutputs,
     },
     PublicKey,
 };
@@ -18,9 +18,9 @@ impl AliceFunder0 {
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
-        secret_init: FunderSecret,
+        special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
     ) -> anyhow::Result<Self> {
-        let common = Funder0::new(offer, special_outputs, secret_init);
+        let common = Funder0::new(offer, special_outputs, special_output_keypairs_funder);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
@@ -44,7 +44,7 @@ impl AliceFunder0 {
         Ok(AliceFunder1(Funder1 {
             offer: self.common.offer,
             special_outputs: self.common.special_outputs,
-            secret_init: self.common.secret_init,
+            special_output_keypairs_funder: self.common.special_output_keypairs_funder,
             SKs_self: self.common.SKs_self,
             PKs_other,
             bulletproof_round_1_self: self.bulletproof_round_1_self,
@@ -82,9 +82,9 @@ impl AliceRedeemer0 {
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
-        secret_init: RedeemerSecret,
+        special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
     ) -> anyhow::Result<Self> {
-        let common = Redeemer0::new(offer, special_outputs, secret_init);
+        let common = Redeemer0::new(offer, special_outputs, special_output_keypairs_redeemer);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {

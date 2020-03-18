@@ -20,7 +20,7 @@ pub use crate::{
         keys::{PKs, SKs},
         offer::Offer,
         sign::FunderActions,
-        special_outputs::SpecialOutputs,
+        special_outputs::*,
         wallet::{Wallet, Wallets},
     },
     schnorr::EncryptedSignature,
@@ -36,18 +36,22 @@ pub use sign::RedeemerSigs;
 pub struct Funder0 {
     pub offer: Offer,
     pub special_outputs: SpecialOutputs,
-    pub secret_init: FunderSecret,
+    pub special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
     pub SKs_self: SKs,
 }
 
 impl Funder0 {
-    pub fn new(offer: Offer, special_outputs: SpecialOutputs, secret_init: FunderSecret) -> Self {
+    pub fn new(
+        offer: Offer,
+        special_outputs: SpecialOutputs,
+        special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
+    ) -> Self {
         let SKs_self = keygen();
 
         Self {
             offer,
             special_outputs,
-            secret_init,
+            special_output_keypairs_funder,
             SKs_self,
         }
     }
@@ -56,7 +60,7 @@ impl Funder0 {
 pub struct Funder1 {
     pub offer: Offer,
     pub special_outputs: SpecialOutputs,
-    pub secret_init: FunderSecret,
+    pub special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
     pub bulletproof_round_1_self: bulletproof::Round1,
@@ -73,7 +77,7 @@ impl Funder1 {
         let (FunderActions { fund, refund }, redeem_encsig) = sign::funder(
             &self.offer,
             &self.special_outputs,
-            &self.secret_init,
+            &self.special_output_keypairs_funder,
             &self.SKs_self,
             &self.PKs_other,
             &Y,
@@ -101,18 +105,22 @@ pub struct Funder2 {
 pub struct Redeemer0 {
     pub offer: Offer,
     pub special_outputs: SpecialOutputs,
-    pub secret_init: RedeemerSecret,
+    pub special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
     pub SKs_self: SKs,
 }
 
 impl Redeemer0 {
-    pub fn new(offer: Offer, special_outputs: SpecialOutputs, secret_init: RedeemerSecret) -> Self {
+    pub fn new(
+        offer: Offer,
+        special_outputs: SpecialOutputs,
+        special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
+    ) -> Self {
         let SKs_self = keygen();
 
         Self {
             offer,
             special_outputs,
-            secret_init,
+            special_output_keypairs_redeemer,
             SKs_self,
         }
     }
@@ -121,7 +129,7 @@ impl Redeemer0 {
 pub struct Redeemer1 {
     pub offer: Offer,
     pub special_outputs: SpecialOutputs,
-    pub secret_init: RedeemerSecret,
+    pub special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
 }
@@ -137,7 +145,7 @@ impl Redeemer1 {
         let (redeemer_sigs, bulletproof_round_2_self) = sign::redeemer(
             &prev_state.offer,
             &prev_state.special_outputs,
-            &prev_state.secret_init,
+            &prev_state.special_output_keypairs_redeemer,
             &prev_state.SKs_self,
             &PKs_other,
             &Y,
@@ -148,7 +156,7 @@ impl Redeemer1 {
         let state = Redeemer1 {
             offer: prev_state.offer,
             special_outputs: prev_state.special_outputs,
-            secret_init: prev_state.secret_init,
+            special_output_keypairs_redeemer: prev_state.special_output_keypairs_redeemer,
             SKs_self: prev_state.SKs_self,
             PKs_other,
         };
@@ -164,7 +172,7 @@ impl Redeemer1 {
         let encrypted_redeem_action = action::EncryptedRedeem::new(
             self.offer,
             self.special_outputs,
-            self.secret_init,
+            self.special_output_keypairs_redeemer,
             self.SKs_self,
             self.PKs_other,
             Y,
@@ -193,34 +201,6 @@ fn keygen() -> SKs {
         r_fund,
         r_redeem,
         r_refund,
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FunderSecret {
-    pub fund_input_key: KeyPair,
-    pub refund_output_key: KeyPair,
-}
-
-impl FunderSecret {
-    pub fn new_random() -> Self {
-        Self {
-            fund_input_key: KeyPair::new_random(),
-            refund_output_key: KeyPair::new_random(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RedeemerSecret {
-    pub redeem_output_key: KeyPair,
-}
-
-impl RedeemerSecret {
-    pub fn new_random() -> Self {
-        Self {
-            redeem_output_key: KeyPair::new_random(),
-        }
     }
 }
 

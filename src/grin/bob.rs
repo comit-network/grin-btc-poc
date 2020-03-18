@@ -1,8 +1,8 @@
 use crate::{
     grin::{
         action, bulletproof, event, normalize_redeem_keys_bob, EncryptedSignature, Funder0,
-        Funder1, FunderSecret, Offer, PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2,
-        RedeemerSecret, RedeemerSigs, SKs, SpecialOutputs,
+        Funder1, Offer, PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2, RedeemerSigs, SKs,
+        SpecialOutputKeyPairsFunder, SpecialOutputKeyPairsRedeemer, SpecialOutputs,
     },
     schnorr::RecoveryKey,
 };
@@ -19,10 +19,10 @@ impl BobFunder0 {
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
-        secret_init: FunderSecret,
+        special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<Self> {
-        let common = Funder0::new(offer, special_outputs, secret_init);
+        let common = Funder0::new(offer, special_outputs, special_output_keypairs_funder);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
@@ -42,7 +42,7 @@ impl BobFunder0 {
         let state = Funder1 {
             offer: self.common.offer.clone(),
             special_outputs: self.common.special_outputs.clone(),
-            secret_init: self.common.secret_init,
+            special_output_keypairs_funder: self.common.special_output_keypairs_funder,
             SKs_self: self.common.SKs_self.clone(),
             PKs_other: PKs_other.clone(),
             bulletproof_round_1_self: self.bulletproof_round_1_self,
@@ -112,10 +112,10 @@ impl BobRedeemer0 {
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
-        secret_init: RedeemerSecret,
+        special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<Self> {
-        let common = Redeemer0::new(offer, special_outputs, secret_init);
+        let common = Redeemer0::new(offer, special_outputs, special_output_keypairs_redeemer);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {

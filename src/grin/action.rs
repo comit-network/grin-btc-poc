@@ -2,7 +2,7 @@ use crate::{
     grin::{
         self, compute_excess_pk, compute_excess_sk, compute_offset,
         wallet::{build_input, build_output},
-        Offer, PKs, RedeemerSecret, SKs, SpecialOutputs,
+        Offer, PKs, SKs, SpecialOutputKeyPairsRedeemer, SpecialOutputs,
     },
     keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
     schnorr, Execute,
@@ -86,7 +86,7 @@ impl EncryptedRedeem {
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
-        secret_init: RedeemerSecret,
+        special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
         redeemer_SKs: SKs,
         funder_PKs: PKs,
         Y: PublicKey,
@@ -134,7 +134,10 @@ impl EncryptedRedeem {
 
             let bulletproof = SECP.bullet_proof(
                 offer.fund_output_amount(),
-                secret_init.redeem_output_key.secret_key.clone(),
+                special_output_keypairs_redeemer
+                    .redeem_output_key
+                    .secret_key
+                    .clone(),
                 random_secret_key(),
                 random_secret_key(),
                 None,
@@ -143,7 +146,9 @@ impl EncryptedRedeem {
 
             let outputs = vec![(
                 offer.fund_output_amount(),
-                secret_init.redeem_output_key.public_key,
+                special_output_keypairs_redeemer
+                    .redeem_output_key
+                    .public_key,
                 bulletproof,
             )];
 
@@ -178,7 +183,7 @@ impl EncryptedRedeem {
             incomplete_transaction_to_special_output,
             special_output: (
                 offer.fund_output_amount(),
-                secret_init.redeem_output_key,
+                special_output_keypairs_redeemer.redeem_output_key,
                 offer.fee,
             ),
             encsig,

@@ -17,12 +17,12 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
     pub fn new(
         offer_grin: grin::Offer,
         outputs_grin: grin::SpecialOutputs,
+        output_keypairs_grin_funder: grin::SpecialOutputKeyPairsFunder,
         offer_bitcoin: bitcoin::Offer,
         outputs_bitcoin: bitcoin::WalletOutputs,
-        secret_init_grin: grin::FunderSecret,
     ) -> anyhow::Result<(Self, Message0)> {
         let grin_state =
-            grin::alice::AliceFunder0::new(offer_grin, outputs_grin, secret_init_grin)?;
+            grin::alice::AliceFunder0::new(offer_grin, outputs_grin, output_keypairs_grin_funder)?;
         let bitcoin_state = bitcoin::alice::AliceRedeemer0::new(offer_bitcoin, outputs_bitcoin);
 
         Ok(Alice0::state_and_message(
@@ -75,11 +75,14 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
         outputs_bitcoin: bitcoin::WalletOutputs,
         offer_grin: grin::Offer,
         outputs_grin: grin::SpecialOutputs,
-        secret_init_grin: grin::RedeemerSecret,
+        output_keypairs_grin_redeemer: grin::SpecialOutputKeyPairsRedeemer,
     ) -> anyhow::Result<(Self, Message0)> {
         let bitcoin_state = bitcoin::alice::AliceFunder0::new(offer_bitcoin, outputs_bitcoin);
-        let grin_state =
-            grin::alice::AliceRedeemer0::new(offer_grin, outputs_grin, secret_init_grin)?;
+        let grin_state = grin::alice::AliceRedeemer0::new(
+            offer_grin,
+            outputs_grin,
+            output_keypairs_grin_redeemer,
+        )?;
 
         Ok(Alice0::state_and_message(
             bitcoin_state,

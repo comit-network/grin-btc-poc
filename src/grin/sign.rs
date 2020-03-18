@@ -1,7 +1,8 @@
 use crate::{
     grin::{
-        action, bulletproof, compute_excess_pk, compute_excess_sk, compute_offset, FunderSecret,
-        KernelFeatures, Offer, PKs, RedeemerSecret, SKs, SpecialOutputs,
+        action, bulletproof, compute_excess_pk, compute_excess_sk, compute_offset, KernelFeatures,
+        Offer, PKs, SKs, SpecialOutputKeyPairsFunder, SpecialOutputKeyPairsRedeemer,
+        SpecialOutputs,
     },
     keypair::{random_secret_key, KeyPair, PublicKey, SECP},
     schnorr,
@@ -17,7 +18,7 @@ pub struct RedeemerSigs {
 pub fn redeemer(
     offer: &Offer,
     special_outputs: &SpecialOutputs,
-    secret_init: &RedeemerSecret,
+    special_output_keypairs_redeemer: &SpecialOutputKeyPairsRedeemer,
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
     Y: &PublicKey,
@@ -102,7 +103,11 @@ pub fn redeemer(
 
         let half_excess_keypair_redeemer = KeyPair::new(compute_excess_sk(
             vec![&redeemer_SKs.x.secret_key],
-            vec![&secret_init.redeem_output_key.secret_key],
+            vec![
+                &special_output_keypairs_redeemer
+                    .redeem_output_key
+                    .secret_key,
+            ],
             Some(&offset),
         )?);
 
@@ -147,7 +152,7 @@ pub struct FunderActions {
 pub fn funder(
     offer: &Offer,
     special_outputs: &SpecialOutputs,
-    secret_init: &FunderSecret,
+    special_output_keypairs_funder: &SpecialOutputKeyPairsFunder,
     funder_SKs: &SKs,
     redeemer_PKs: &PKs,
     Y: &PublicKey,
@@ -166,7 +171,7 @@ pub fn funder(
         let offset = compute_offset(&funder_SKs.r_fund.public_key, &redeemer_PKs.R_fund)?;
 
         let half_excess_keypair_funder = KeyPair::new(compute_excess_sk(
-            vec![&secret_init.fund_input_key.secret_key],
+            vec![&special_output_keypairs_funder.fund_input_key.secret_key],
             vec![&funder_SKs.x.secret_key],
             None,
         )?);
@@ -213,7 +218,7 @@ pub fn funder(
         action::Fund::new(
             vec![(
                 offer.fund_output_amount(),
-                secret_init.fund_input_key.public_key,
+                special_output_keypairs_funder.fund_input_key.public_key,
             )],
             vec![(offer.fund_output_amount(), X, bulletproof)],
             excess_pk,
@@ -222,7 +227,7 @@ pub fn funder(
             offset,
             (
                 offer.fund_output_amount(),
-                secret_init.fund_input_key.clone(),
+                special_output_keypairs_funder.fund_input_key.clone(),
                 offer.fee,
             ),
         )?
@@ -233,7 +238,7 @@ pub fn funder(
 
         let half_excess_keypair_funder = KeyPair::new(compute_excess_sk(
             vec![&funder_SKs.x.secret_key],
-            vec![&secret_init.refund_output_key.secret_key],
+            vec![&special_output_keypairs_funder.refund_output_key.secret_key],
             None,
         )?);
 
@@ -257,7 +262,10 @@ pub fn funder(
 
         let bulletproof = SECP.bullet_proof(
             offer.refund_output_amount(),
-            secret_init.refund_output_key.secret_key.clone(),
+            special_output_keypairs_funder
+                .refund_output_key
+                .secret_key
+                .clone(),
             random_secret_key(),
             random_secret_key(),
             None,
@@ -268,14 +276,14 @@ pub fn funder(
             vec![(offer.fund_output_amount(), X)],
             vec![(
                 offer.refund_output_amount(),
-                secret_init.refund_output_key.public_key,
+                special_output_keypairs_funder.refund_output_key.public_key,
                 bulletproof,
             )],
             excess,
             excess_sig,
             kernel_features,
             offset,
-            secret_init.refund_output_key.clone(),
+            special_output_keypairs_funder.refund_output_key.clone(),
         )?
     };
 

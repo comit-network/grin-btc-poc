@@ -1,7 +1,7 @@
 use crate::{
     bitcoin,
     commit::Commitment,
-    grin::{self, bulletproof, FunderSecret, RedeemerSecret},
+    grin::{self, bulletproof},
     keypair,
     messages::{Message0, Message1, Message2, Message3, Message4},
 };
@@ -17,9 +17,9 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
     pub fn new(
         offer_grin: grin::Offer,
         outputs_grin: grin::SpecialOutputs,
+        output_keypairs_grin_redeemer: grin::SpecialOutputKeyPairsRedeemer,
         offer_bitcoin: bitcoin::Offer,
         outputs_bitcoin: bitcoin::WalletOutputs,
-        secret_init_grin: RedeemerSecret,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<grin::PKs, bitcoin::PKs>)> {
         let alice_commitment = message.commitment;
@@ -27,7 +27,7 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         let grin_state = grin::bob::BobRedeemer0::new(
             offer_grin,
             outputs_grin,
-            secret_init_grin,
+            output_keypairs_grin_redeemer,
             message.bulletproof_round_1_alice,
         )?;
         let bitcoin_state = bitcoin::bob::BobFunder0::new(offer_bitcoin, outputs_bitcoin);
@@ -83,7 +83,7 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         outputs_bitcoin: bitcoin::WalletOutputs,
         offer_grin: grin::Offer,
         outputs_grin: grin::SpecialOutputs,
-        secret_init_grin: FunderSecret,
+        output_keypairs_grin_funder: grin::SpecialOutputKeyPairsFunder,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<bitcoin::PKs, grin::PKs>)> {
         let alice_commitment = message.commitment;
@@ -92,7 +92,7 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         let grin_state = grin::bob::BobFunder0::new(
             offer_grin,
             outputs_grin,
-            secret_init_grin,
+            output_keypairs_grin_funder,
             message.bulletproof_round_1_alice,
         )?;
 

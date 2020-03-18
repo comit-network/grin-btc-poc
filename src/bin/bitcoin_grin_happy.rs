@@ -22,22 +22,9 @@ fn main() -> anyhow::Result<()> {
 
     let alice_beta_starting_balance = alice_beta_wallet.get_balance()?;
 
-    // Set-up parameters
-    let grin_funder_secret_init = grin::FunderSecret::new_random();
-    let grin_redeemer_secret_init = grin::RedeemerSecret::new_random();
-
-    let offer_grin = grin::Offer {
-        asset: 10_000_000_000,
-        fee: 5_000_000,
-        expiry: 0,
-    };
-    let outputs_grin = grin::SpecialOutputs {
-        fund_input_key: grin_funder_secret_init.fund_input_key.public_key,
-        redeem_output_key: grin_redeemer_secret_init.redeem_output_key.public_key,
-        refund_output_key: grin_funder_secret_init.refund_output_key.public_key,
-        // TODO: Figure out how to generate the common nonce properly
-        bulletproof_common_nonce: random_secret_key(),
-    };
+    // Base parameters of the swap, including the offer negotiated prior to
+    // executing this protocol, and a set of outputs per party to know where the
+    // assets come from and go to during the execution phase of the protocol
 
     let offer_bitcoin = bitcoin::Offer {
         asset: 100_000_000,
@@ -51,12 +38,29 @@ fn main() -> anyhow::Result<()> {
         refund_address: alice_alpha_wallet.refund_output_address(),
     };
 
+    let offer_grin = grin::Offer {
+        asset: 10_000_000_000,
+        fee: 5_000_000,
+        expiry: 0,
+    };
+    let output_keypairs_grin_funder = grin::SpecialOutputKeyPairsFunder::new_random();
+    let output_keypairs_grin_redeemer = grin::SpecialOutputKeyPairsRedeemer::new_random();
+    let outputs_grin = grin::SpecialOutputs {
+        fund_input_key: output_keypairs_grin_funder.fund_input_key.public_key,
+        redeem_output_key: output_keypairs_grin_redeemer.redeem_output_key.public_key,
+        refund_output_key: output_keypairs_grin_funder.refund_output_key.public_key,
+        // TODO: Figure out how to generate the common nonce properly
+        bulletproof_common_nonce: random_secret_key(),
+    };
+
+    // Key generation and signing
+
     let (alice0, message0) = Alice0::<bitcoin::AliceFunder0, grin::AliceRedeemer0>::new(
         offer_bitcoin.clone(),
         outputs_bitcoin.clone(),
         offer_grin.clone(),
         outputs_grin.clone(),
-        grin_redeemer_secret_init,
+        output_keypairs_grin_redeemer,
     )?;
 
     let (bob0, message1) = Bob0::<bitcoin::BobRedeemer0, grin::BobFunder0>::new(
@@ -64,7 +68,7 @@ fn main() -> anyhow::Result<()> {
         outputs_bitcoin,
         offer_grin.clone(),
         outputs_grin,
-        grin_funder_secret_init,
+        output_keypairs_grin_funder,
         message0,
     )?;
 
@@ -75,6 +79,8 @@ fn main() -> anyhow::Result<()> {
     let (alice2, message4) = alice1.receive(message3)?;
 
     let bob2 = bob1.receive(message4)?;
+
+    // Execution
 
     alice2
         .alpha_state
@@ -104,6 +110,8 @@ fn main() -> anyhow::Result<()> {
     // Verify that bob gets the agreed upon bitcoin
     assert!(bob_alpha_wallet
         .verify_payment_to_redeem_output_address(alpha_redeem_txid, offer_bitcoin.asset)?);
+
+    // Clean-up
 
     grin::Wallets::clean_up();
     bitcoin_node.kill()?;
