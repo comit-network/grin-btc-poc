@@ -44,6 +44,7 @@ impl FunderWallet {
         let mut completed_tx = transaction;
         let sighash_components = SighashComponents::new(&completed_tx);
 
+        #[allow(clippy::toplevel_ref_arg)]
         for ref mut input in &mut completed_tx.input {
             let wallet_input = self.fund_input();
 
@@ -137,7 +138,7 @@ impl LookFor for FunderWallet {
             .witness
             .iter()
             .find_map(|witness| {
-                if witness.len() == 0 {
+                if witness.is_empty() {
                     return None;
                 }
 

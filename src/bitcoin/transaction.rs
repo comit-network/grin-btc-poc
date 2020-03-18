@@ -1,4 +1,4 @@
-use crate::bitcoin;
+use crate::bitcoin::{Offer, WalletOutputs};
 use ::bitcoin::{
     blockdata::{opcodes, script},
     hashes::sha256d::Hash,
@@ -8,10 +8,11 @@ use ::bitcoin::{
 use secp256k1zkp::key::PublicKey;
 
 pub fn fund_transaction(
-    init: &bitcoin::BaseParameters,
+    offer: &Offer,
+    wallet_outputs: &WalletOutputs,
     redeemer_key: &PublicKey,
     funder_key: &PublicKey,
-) -> (Transaction, Script) {
+) -> anyhow::Result<(Transaction, Script)> {
     let fund_output_script = script::Builder::new()
         .push_int(2)
         .push_key(&::bitcoin::util::key::PublicKey {
@@ -29,7 +30,7 @@ pub fn fund_transaction(
     let fund_output_addr = Address::p2wsh(&fund_output_script, Network::Regtest);
     let transaction = Transaction {
         input: vec![TxIn {
-            previous_output: init.input.outpoint,
+            previous_output: wallet_outputs.fund_input.outpoint,
             sequence: 0xffff_ffff,
             witness: Vec::new(),
             script_sig: Script::new(),
@@ -37,22 +38,23 @@ pub fn fund_transaction(
         output: vec![
             TxOut {
                 script_pubkey: fund_output_addr.script_pubkey(),
-                value: init.asset + init.fee, // funder pays for fee of redeem/refund tx
+                value: offer.fund_output_amount(),
             },
             TxOut {
-                script_pubkey: init.change.0.script_pubkey(),
-                value: init.change.1,
+                script_pubkey: wallet_outputs.fund_change_address.script_pubkey(),
+                value: offer.change_output_amount(wallet_outputs.fund_input.txout.value)?,
             },
         ],
         lock_time: 0,
         version: 2,
     };
 
-    (transaction, fund_output_script)
+    Ok((transaction, fund_output_script))
 }
 
 pub fn refund_transaction(
-    init: &bitcoin::BaseParameters,
+    offer: &Offer,
+    wallet_outputs: &WalletOutputs,
     fund_transaction_id: Hash,
 ) -> Transaction {
     Transaction {
@@ -66,16 +68,17 @@ pub fn refund_transaction(
             script_sig: Script::new(),
         }],
         output: vec![TxOut {
-            script_pubkey: init.refund_address.script_pubkey(),
-            value: init.asset,
+            script_pubkey: wallet_outputs.refund_address.script_pubkey(),
+            value: offer.refund_output_amount(),
         }],
-        lock_time: init.expiry,
+        lock_time: offer.expiry,
         version: 2,
     }
 }
 
 pub fn redeem_transaction(
-    init: &bitcoin::BaseParameters,
+    offer: &Offer,
+    wallet_outputs: &WalletOutputs,
     fund_transaction_id: Hash,
 ) -> Transaction {
     Transaction {
@@ -89,8 +92,8 @@ pub fn redeem_transaction(
             script_sig: Script::new(),
         }],
         output: vec![TxOut {
-            script_pubkey: init.redeem_address.script_pubkey(),
-            value: init.redeem_output_amount(),
+            script_pubkey: wallet_outputs.redeem_address.script_pubkey(),
+            value: offer.redeem_output_amount(),
         }],
         lock_time: 0,
         version: 2,

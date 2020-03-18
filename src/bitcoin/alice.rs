@@ -1,8 +1,7 @@
-use crate::bitcoin::sign::FunderActions;
 use crate::{
     bitcoin::{
-        action, BaseParameters, EncryptedSignature, Funder0, Funder1, PKs, Redeemer0, Redeemer1,
-        Signature,
+        action, sign::FunderActions, wallet_outputs::WalletOutputs, EncryptedSignature, Funder0,
+        Funder1, Offer, PKs, Redeemer0, Redeemer1, Signature,
     },
     KeyPair, PublicKey,
 };
@@ -12,8 +11,8 @@ use std::convert::TryInto;
 pub struct AliceFunder0(pub Funder0);
 
 impl AliceFunder0 {
-    pub fn new(base_parameters: BaseParameters) -> Self {
-        Self(Funder0::new(base_parameters))
+    pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
+        Self(Funder0::new(offer, wallet_outputs))
     }
 
     pub fn transition(self, PKs_other: PKs) -> AliceFunder1 {
@@ -51,14 +50,14 @@ pub struct AliceFunder2 {
 pub struct AliceRedeemer0(pub Redeemer0);
 
 impl AliceRedeemer0 {
-    pub fn new(base_parameters: BaseParameters) -> Self {
-        Self(Redeemer0::new(base_parameters))
+    pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
+        Self(Redeemer0::new(offer, wallet_outputs))
     }
 
-    pub fn transition(self, PKs_other: PKs) -> (AliceRedeemer1, Signature) {
-        let (state, redeemer_refund_sig) = self.0.transition(PKs_other);
+    pub fn transition(self, PKs_other: PKs) -> anyhow::Result<(AliceRedeemer1, Signature)> {
+        let (state, redeemer_refund_sig) = self.0.transition(PKs_other)?;
 
-        (AliceRedeemer1(state), redeemer_refund_sig)
+        Ok((AliceRedeemer1(state), redeemer_refund_sig))
     }
 }
 
@@ -66,16 +65,21 @@ impl AliceRedeemer0 {
 pub struct AliceRedeemer1(pub Redeemer1);
 
 impl AliceRedeemer1 {
-    pub fn transition(self, redeem_encsig: EncryptedSignature, y: &KeyPair) -> AliceRedeemer2 {
+    pub fn transition(
+        self,
+        redeem_encsig: EncryptedSignature,
+        y: &KeyPair,
+    ) -> anyhow::Result<AliceRedeemer2> {
         let encrypted_redeem_action = action::EncryptedRedeem::new(
-            &self.0.base_parameters,
+            &self.0.offer,
+            &self.0.wallet_outputs,
             &self.0.SKs_self,
             &self.0.PKs_other,
             redeem_encsig,
-        );
+        )?;
         let redeem_action = encrypted_redeem_action.decrypt(&y);
 
-        AliceRedeemer2 { redeem_action }
+        Ok(AliceRedeemer2 { redeem_action })
     }
 }
 

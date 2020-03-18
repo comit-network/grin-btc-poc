@@ -2,22 +2,24 @@ use crate::{bitcoin::sign::FunderActions, KeyPair};
 
 pub mod action;
 pub mod alice;
-pub mod base_parameters;
 pub mod bob;
 pub mod client;
 pub mod event;
 pub mod keys;
 pub mod node;
+pub mod offer;
 pub mod sign;
 pub mod transaction;
 pub mod wallet;
+pub mod wallet_outputs;
 
 pub use crate::{
     bitcoin::{
         alice::*,
-        base_parameters::BaseParameters,
         bob::*,
         keys::{PKs, SKs},
+        offer::Offer,
+        wallet_outputs::WalletOutputs,
     },
     ecdsa::EncryptedSignature,
     PublicKey,
@@ -32,16 +34,18 @@ pub use secp256k1zkp::Signature;
 
 #[derive(Clone)]
 pub struct Funder0 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub wallet_outputs: WalletOutputs,
     pub SKs_self: SKs,
 }
 
 impl Funder0 {
-    pub fn new(base_parameters: BaseParameters) -> Self {
+    pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
         let SKs_self = keygen();
 
         Self {
-            base_parameters,
+            offer,
+            wallet_outputs,
             SKs_self,
         }
     }
@@ -49,7 +53,8 @@ impl Funder0 {
 
 #[derive(Clone)]
 pub struct Funder1 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub wallet_outputs: WalletOutputs,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
 }
@@ -57,7 +62,8 @@ pub struct Funder1 {
 impl Funder1 {
     pub fn new(prev_state: Funder0, PKs_other: PKs) -> Self {
         Funder1 {
-            base_parameters: prev_state.base_parameters,
+            offer: prev_state.offer,
+            wallet_outputs: prev_state.wallet_outputs,
             SKs_self: prev_state.SKs_self,
             PKs_other,
         }
@@ -69,7 +75,8 @@ impl Funder1 {
         redeemer_refund_sig: Signature,
     ) -> anyhow::Result<(FunderActions, EncryptedSignature)> {
         let (funder_actions, redeem_encsig) = sign::funder(
-            &self.base_parameters,
+            &self.offer,
+            &self.wallet_outputs,
             &self.SKs_self,
             &self.PKs_other,
             &Y,
@@ -87,36 +94,45 @@ pub struct Funder2 {
 
 #[derive(Clone)]
 pub struct Redeemer0 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub wallet_outputs: WalletOutputs,
     pub SKs_self: SKs,
 }
 
 impl Redeemer0 {
-    pub fn new(base_parameters: BaseParameters) -> Self {
+    pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
         let SKs_self = keygen();
 
         Self {
-            base_parameters,
+            offer,
+            wallet_outputs,
             SKs_self,
         }
     }
 
-    pub fn transition(self, PKs_other: PKs) -> (Redeemer1, Signature) {
-        let redeemer_refund_sig = sign::redeemer(&self.base_parameters, &self.SKs_self, &PKs_other);
+    pub fn transition(self, PKs_other: PKs) -> anyhow::Result<(Redeemer1, Signature)> {
+        let redeemer_refund_sig = sign::redeemer(
+            &self.offer,
+            &self.wallet_outputs,
+            &self.SKs_self,
+            &PKs_other,
+        )?;
 
         let state = Redeemer1 {
-            base_parameters: self.base_parameters,
+            offer: self.offer,
+            wallet_outputs: self.wallet_outputs,
             SKs_self: self.SKs_self,
             PKs_other,
         };
 
-        (state, redeemer_refund_sig)
+        Ok((state, redeemer_refund_sig))
     }
 }
 
 #[derive(Clone)]
 pub struct Redeemer1 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub wallet_outputs: WalletOutputs,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
 }

@@ -1,7 +1,7 @@
 use crate::{
     grin::{
-        self, action, bulletproof, compute_excess_pk, compute_excess_sk, compute_offset,
-        FunderSecret, KernelFeatures, PKs, RedeemerSecret, SKs,
+        action, bulletproof, compute_excess_pk, compute_excess_sk, compute_offset, FunderSecret,
+        KernelFeatures, Offer, PKs, RedeemerSecret, SKs, SpecialOutputs,
     },
     keypair::{random_secret_key, KeyPair, PublicKey, SECP},
     schnorr,
@@ -13,8 +13,10 @@ pub struct RedeemerSigs {
     pub s_hat_redeem: schnorr::PartialEncryptedSignature,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn redeemer(
-    init: &grin::BaseParameters,
+    offer: &Offer,
+    special_outputs: &SpecialOutputs,
     secret_init: &RedeemerSecret,
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
@@ -32,8 +34,11 @@ pub fn redeemer(
         )?);
 
         let s_fund = {
-            let half_excess_pk_funder =
-                compute_excess_pk(vec![&init.fund_input_key], vec![&funder_PKs.X], None)?;
+            let half_excess_pk_funder = compute_excess_pk(
+                vec![&special_outputs.fund_input_key],
+                vec![&funder_PKs.X],
+                None,
+            )?;
 
             schnorr::sign_2p_0(
                 &half_excess_keypair_redeemer,
@@ -54,8 +59,8 @@ pub fn redeemer(
                 &redeemer_SKs.x.secret_key,
                 &redeemer_SKs.x.secret_key,
                 &excess_pk,
-                init.fund_output_amount(),
-                &init.bulletproof_common_nonce,
+                offer.fund_output_amount(),
+                &special_outputs.bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
                 &bulletproof_round_1_funder,
             )?
@@ -73,8 +78,11 @@ pub fn redeemer(
             KeyPair::new(half_excess_sk_redeemer)
         };
 
-        let half_excess_pk_funder =
-            compute_excess_pk(vec![&funder_PKs.X], vec![&init.refund_output_key], None)?;
+        let half_excess_pk_funder = compute_excess_pk(
+            vec![&funder_PKs.X],
+            vec![&special_outputs.refund_output_key],
+            None,
+        )?;
 
         schnorr::sign_2p_0(
             &half_excess_keypair_redeemer,
@@ -83,7 +91,7 @@ pub fn redeemer(
             &funder_PKs.R_refund,
             &KernelFeatures::HeightLocked {
                 fee: 0,
-                lock_height: init.expiry,
+                lock_height: offer.expiry,
             }
             .kernel_sig_msg()?,
         )?
@@ -135,8 +143,10 @@ pub struct FunderActions {
     pub refund: action::Refund,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn funder(
-    init: &grin::BaseParameters,
+    offer: &Offer,
+    special_outputs: &SpecialOutputs,
     secret_init: &FunderSecret,
     funder_SKs: &SKs,
     redeemer_PKs: &PKs,
@@ -181,8 +191,8 @@ pub fn funder(
                 &funder_SKs.x.secret_key,
                 &funder_SKs.x.secret_key,
                 &X,
-                init.fund_output_amount(),
-                &init.bulletproof_common_nonce,
+                offer.fund_output_amount(),
+                &special_outputs.bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
                 &bulletproof_round_1_funder,
             )?;
@@ -190,8 +200,8 @@ pub fn funder(
                 &funder_SKs.x.secret_key,
                 &funder_SKs.x.secret_key,
                 &X,
-                init.fund_output_amount(),
-                &init.bulletproof_common_nonce,
+                offer.fund_output_amount(),
+                &special_outputs.bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
                 &bulletproof_round_1_funder,
                 &bulletproof_round_2_redeemer,
@@ -202,18 +212,18 @@ pub fn funder(
 
         action::Fund::new(
             vec![(
-                init.fund_output_amount(),
+                offer.fund_output_amount(),
                 secret_init.fund_input_key.public_key,
             )],
-            vec![(init.fund_output_amount(), X, bulletproof)],
+            vec![(offer.fund_output_amount(), X, bulletproof)],
             excess_pk,
             excess_sig,
             kernel_features,
             offset,
             (
-                init.fund_output_amount(),
+                offer.fund_output_amount(),
                 secret_init.fund_input_key.clone(),
-                init.fee,
+                offer.fee,
             ),
         )?
     };
@@ -232,7 +242,7 @@ pub fn funder(
 
         let kernel_features = KernelFeatures::HeightLocked {
             fee: 0,
-            lock_height: init.expiry,
+            lock_height: offer.expiry,
         };
 
         let (excess_sig, excess) = schnorr::sign_2p_1(
@@ -246,7 +256,7 @@ pub fn funder(
         .map_err(|_| RedeemerSignatureError::Refund)?;
 
         let bulletproof = SECP.bullet_proof(
-            init.refund_output_amount(),
+            offer.refund_output_amount(),
             secret_init.refund_output_key.secret_key.clone(),
             random_secret_key(),
             random_secret_key(),
@@ -255,9 +265,9 @@ pub fn funder(
         );
 
         action::Refund::new(
-            vec![(init.fund_output_amount(), X)],
+            vec![(offer.fund_output_amount(), X)],
             vec![(
-                init.refund_output_amount(),
+                offer.refund_output_amount(),
                 secret_init.refund_output_key.public_key,
                 bulletproof,
             )],
@@ -280,7 +290,7 @@ pub fn funder(
 
         let half_excess_pk_redeemer = compute_excess_pk(
             vec![&redeemer_PKs.X],
-            vec![&init.redeem_output_key],
+            vec![&special_outputs.redeem_output_key],
             Some(&offset),
         )?;
 

@@ -1,9 +1,9 @@
 use crate::{
     bitcoin::{
-        self,
         transaction::{fund_transaction, redeem_transaction},
         wallet::{signature_into_witness, FunderWallet, RedeemerWallet},
-        Client, PKs, SKs, Signature, Transaction,
+        wallet_outputs::WalletOutputs,
+        Client, Offer, PKs, SKs, Signature, Transaction,
     },
     ecdsa,
     keypair::KeyPair,
@@ -41,15 +41,21 @@ pub struct EncryptedRedeem {
 
 impl EncryptedRedeem {
     pub fn new(
-        init: &bitcoin::BaseParameters,
+        offer: &Offer,
+        wallet_outputs: &WalletOutputs,
         redeemer_SKs: &SKs,
         funder_PKs: &PKs,
         funder_encsig: ecdsa::EncryptedSignature,
-    ) -> Self {
-        let (fund_transaction, fund_output_script) =
-            fund_transaction(&init, &redeemer_SKs.x.public_key, &funder_PKs.X);
+    ) -> anyhow::Result<Self> {
+        let (fund_transaction, fund_output_script) = fund_transaction(
+            &offer,
+            &wallet_outputs,
+            &redeemer_SKs.x.public_key,
+            &funder_PKs.X,
+        )?;
 
-        let redeem_transaction = redeem_transaction(&init, fund_transaction.txid());
+        let redeem_transaction =
+            redeem_transaction(&offer, &wallet_outputs, fund_transaction.txid());
 
         let redeemer_sig = {
             let redeem_digest = SighashComponents::new(&redeem_transaction).sighash_all(
@@ -63,12 +69,12 @@ impl EncryptedRedeem {
             redeemer_SKs.x.sign_ecdsa(&redeem_digest)
         };
 
-        Self {
+        Ok(Self {
             transaction: redeem_transaction,
             redeemer_sig,
             funder_encsig,
             fund_output_script,
-        }
+        })
     }
 
     pub fn decrypt(self, y: &KeyPair) -> Redeem {

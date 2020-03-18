@@ -93,6 +93,7 @@ impl Wallets {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct Wallet {
     inner: Arc<
         Mutex<

@@ -1,5 +1,5 @@
 use crate::{
-    grin::{self, compute_excess_pk, compute_offset, PKs},
+    grin::{compute_excess_pk, compute_offset, PKs, SpecialOutputs},
     keypair::build_commitment,
 };
 use secp256k1zkp::pedersen::Commitment;
@@ -10,7 +10,7 @@ pub struct Redeem {
 
 impl Redeem {
     pub fn new(
-        init: &grin::BaseParameters,
+        special_outputs: &SpecialOutputs,
         redeemer_PKs: &PKs,
         funder_PKs: &PKs,
     ) -> anyhow::Result<Self> {
@@ -18,7 +18,7 @@ impl Redeem {
 
         let excess_pk = compute_excess_pk(
             vec![&redeemer_PKs.X, &funder_PKs.X],
-            vec![&init.redeem_output_key],
+            vec![&special_outputs.redeem_output_key],
             Some(&offset),
         )?;
 

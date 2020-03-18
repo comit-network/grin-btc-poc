@@ -2,7 +2,7 @@ use crate::{
     grin::{
         self, compute_excess_pk, compute_excess_sk, compute_offset,
         wallet::{build_input, build_output},
-        PKs, RedeemerSecret, SKs,
+        Offer, PKs, RedeemerSecret, SKs, SpecialOutputs,
     },
     keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
     schnorr, Execute,
@@ -84,7 +84,8 @@ pub struct EncryptedRedeem {
 
 impl EncryptedRedeem {
     pub fn new(
-        init: grin::BaseParameters,
+        offer: Offer,
+        special_outputs: SpecialOutputs,
         secret_init: RedeemerSecret,
         redeemer_SKs: SKs,
         funder_PKs: PKs,
@@ -95,7 +96,7 @@ impl EncryptedRedeem {
 
         let excess_pk = compute_excess_pk(
             vec![&redeemer_SKs.x.public_key, &funder_PKs.X],
-            vec![&init.redeem_output_key],
+            vec![&special_outputs.redeem_output_key],
             Some(&offset),
         )?;
 
@@ -124,7 +125,7 @@ impl EncryptedRedeem {
 
         let incomplete_transaction_to_special_output = {
             let inputs = vec![(
-                init.fund_output_amount(),
+                offer.fund_output_amount(),
                 PublicKey::from_combination(&*SECP, vec![
                     &redeemer_SKs.x.public_key,
                     &funder_PKs.X,
@@ -132,7 +133,7 @@ impl EncryptedRedeem {
             )];
 
             let bulletproof = SECP.bullet_proof(
-                init.fund_output_amount(),
+                offer.fund_output_amount(),
                 secret_init.redeem_output_key.secret_key.clone(),
                 random_secret_key(),
                 random_secret_key(),
@@ -141,7 +142,7 @@ impl EncryptedRedeem {
             );
 
             let outputs = vec![(
-                init.fund_output_amount(),
+                offer.fund_output_amount(),
                 secret_init.redeem_output_key.public_key,
                 bulletproof,
             )];
@@ -176,9 +177,9 @@ impl EncryptedRedeem {
         Ok(Self {
             incomplete_transaction_to_special_output,
             special_output: (
-                init.fund_output_amount(),
+                offer.fund_output_amount(),
                 secret_init.redeem_output_key,
-                init.fee,
+                offer.fee,
             ),
             encsig,
             R_hat,

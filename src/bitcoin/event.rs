@@ -1,8 +1,8 @@
 use crate::{
     bitcoin::{
-        self,
         transaction::{fund_transaction, redeem_transaction},
-        PKs,
+        wallet_outputs::WalletOutputs,
+        Offer, PKs,
     },
     keypair::PublicKey,
 };
@@ -22,13 +22,15 @@ pub struct Redeem {
 
 impl Redeem {
     pub fn new(
-        init: &bitcoin::BaseParameters,
+        offer: &Offer,
+        wallet_outputs: &WalletOutputs,
         redeemer_PKs: &PKs,
         funder_PKs: &PKs,
     ) -> anyhow::Result<Self> {
         let (fund_transaction, fund_output_script) =
-            fund_transaction(&init, &redeemer_PKs.X, &funder_PKs.X);
-        let redeem_transaction = redeem_transaction(&init, fund_transaction.txid());
+            fund_transaction(&offer, &wallet_outputs, &redeemer_PKs.X, &funder_PKs.X)?;
+        let redeem_transaction =
+            redeem_transaction(&offer, &wallet_outputs, fund_transaction.txid());
 
         let redeem_digest = SighashComponents::new(&redeem_transaction).sighash_all(
             &redeem_transaction.input[0],

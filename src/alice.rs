@@ -15,12 +15,15 @@ pub struct Alice0<AL, BL> {
 
 impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
     pub fn new(
-        base_parameters_grin: grin::BaseParameters,
-        base_parameters_bitcoin: bitcoin::BaseParameters,
+        offer_grin: grin::Offer,
+        outputs_grin: grin::SpecialOutputs,
+        offer_bitcoin: bitcoin::Offer,
+        outputs_bitcoin: bitcoin::WalletOutputs,
         secret_init_grin: grin::FunderSecret,
     ) -> anyhow::Result<(Self, Message0)> {
-        let grin_state = grin::alice::AliceFunder0::new(base_parameters_grin, secret_init_grin)?;
-        let bitcoin_state = bitcoin::alice::AliceRedeemer0::new(base_parameters_bitcoin);
+        let grin_state =
+            grin::alice::AliceFunder0::new(offer_grin, outputs_grin, secret_init_grin)?;
+        let bitcoin_state = bitcoin::alice::AliceRedeemer0::new(offer_bitcoin, outputs_bitcoin);
 
         Ok(Alice0::state_and_message(
             grin_state.clone(),
@@ -50,7 +53,7 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
             message.bulletproof_round_1_bob,
         )?;
         let (bitcoin_state, bitcoin_redeemer_refund_sig) =
-            self.beta_state.transition(message.PKs_beta);
+            self.beta_state.transition(message.PKs_beta)?;
 
         Ok((
             Alice1 {
@@ -68,12 +71,15 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
 
 impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
     pub fn new(
-        base_parameters_bitcoin: bitcoin::BaseParameters,
-        base_parameters_grin: grin::BaseParameters,
+        offer_bitcoin: bitcoin::Offer,
+        outputs_bitcoin: bitcoin::WalletOutputs,
+        offer_grin: grin::Offer,
+        outputs_grin: grin::SpecialOutputs,
         secret_init_grin: grin::RedeemerSecret,
     ) -> anyhow::Result<(Self, Message0)> {
-        let bitcoin_state = bitcoin::alice::AliceFunder0::new(base_parameters_bitcoin);
-        let grin_state = grin::alice::AliceRedeemer0::new(base_parameters_grin, secret_init_grin)?;
+        let bitcoin_state = bitcoin::alice::AliceFunder0::new(offer_bitcoin, outputs_bitcoin);
+        let grin_state =
+            grin::alice::AliceRedeemer0::new(offer_grin, outputs_grin, secret_init_grin)?;
 
         Ok(Alice0::state_and_message(
             bitcoin_state,
@@ -82,6 +88,7 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
         ))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn receive(
         mut self,
         message: Message1<bitcoin::PKs, grin::PKs>,
@@ -171,7 +178,7 @@ impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
         )?;
         let bitcoin_state = self
             .beta_state
-            .transition(message.beta_redeem_encsig, &self.y);
+            .transition(message.beta_redeem_encsig, &self.y)?;
 
         let state = Alice2 {
             alpha_state: grin_state,

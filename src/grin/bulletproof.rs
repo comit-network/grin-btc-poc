@@ -98,6 +98,7 @@ pub struct Round3 {
 }
 
 impl Round3 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         private_nonce_salt: &SecretKey,
         x_j: &SecretKey,

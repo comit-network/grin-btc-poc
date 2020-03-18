@@ -1,8 +1,8 @@
 use crate::{
     grin::{
-        action, bulletproof, event, normalize_redeem_keys_bob, BaseParameters, EncryptedSignature,
-        Funder0, Funder1, FunderSecret, PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2,
-        RedeemerSecret, RedeemerSigs, SKs,
+        action, bulletproof, event, normalize_redeem_keys_bob, EncryptedSignature, Funder0,
+        Funder1, FunderSecret, Offer, PKs, PublicKey, Redeemer0, Redeemer1, Redeemer2,
+        RedeemerSecret, RedeemerSigs, SKs, SpecialOutputs,
     },
     schnorr::RecoveryKey,
 };
@@ -17,11 +17,12 @@ pub struct BobFunder0 {
 
 impl BobFunder0 {
     pub fn new(
-        base_parameters: BaseParameters,
+        offer: Offer,
+        special_outputs: SpecialOutputs,
         secret_init: FunderSecret,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<Self> {
-        let common = Funder0::new(base_parameters, secret_init);
+        let common = Funder0::new(offer, special_outputs, secret_init);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
@@ -39,7 +40,8 @@ impl BobFunder0 {
         bulletproof_round_2_other: bulletproof::Round2,
     ) -> anyhow::Result<(BobFunder1, EncryptedSignature)> {
         let state = Funder1 {
-            base_parameters: self.common.base_parameters.clone(),
+            offer: self.common.offer.clone(),
+            special_outputs: self.common.special_outputs.clone(),
             secret_init: self.common.secret_init,
             SKs_self: self.common.SKs_self.clone(),
             PKs_other: PKs_other.clone(),
@@ -50,11 +52,11 @@ impl BobFunder0 {
         let (state, redeem_encsig) =
             state.transition(redeemer_sigs, &Y, bulletproof_round_2_other)?;
 
-        let recovery_key = RecoveryKey::try_from(redeem_encsig.clone())?;
+        let recovery_key = RecoveryKey::try_from(redeem_encsig)?;
 
         Ok((
             BobFunder1 {
-                base_parameters: self.common.base_parameters,
+                special_outputs: self.common.special_outputs,
                 SKs_self: self.common.SKs_self,
                 PKs_other,
                 fund_action: state.fund_action,
@@ -67,7 +69,7 @@ impl BobFunder0 {
 }
 
 pub struct BobFunder1 {
-    base_parameters: BaseParameters,
+    special_outputs: SpecialOutputs,
     SKs_self: SKs,
     PKs_other: PKs,
     fund_action: action::Fund,
@@ -78,7 +80,7 @@ pub struct BobFunder1 {
 impl BobFunder1 {
     pub fn transition(self) -> anyhow::Result<BobFunder2> {
         let redeem_event = event::Redeem::new(
-            &self.base_parameters,
+            &self.special_outputs,
             &self.PKs_other,
             &self.SKs_self.into(),
         )?;
@@ -108,11 +110,12 @@ pub struct BobRedeemer0 {
 
 impl BobRedeemer0 {
     pub fn new(
-        base_parameters: BaseParameters,
+        offer: Offer,
+        special_outputs: SpecialOutputs,
         secret_init: RedeemerSecret,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<Self> {
-        let common = Redeemer0::new(base_parameters, secret_init);
+        let common = Redeemer0::new(offer, special_outputs, secret_init);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {

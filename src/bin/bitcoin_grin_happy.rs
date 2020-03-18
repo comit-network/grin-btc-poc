@@ -26,35 +26,44 @@ fn main() -> anyhow::Result<()> {
     let grin_funder_secret_init = grin::FunderSecret::new_random();
     let grin_redeemer_secret_init = grin::RedeemerSecret::new_random();
 
-    let base_parameters_bitcoin = bitcoin::BaseParameters::new(
-        100_000_000,
-        1_000,
-        0,
-        alice_alpha_wallet.fund_input(),
-        alice_alpha_wallet.change_output_address(),
-        alice_alpha_wallet.refund_output_address(),
-        bob_alpha_wallet.redeem_output_address(),
-    )
-    .expect("cannot fail");
-    let base_parameters_grin = grin::BaseParameters {
+    let offer_grin = grin::Offer {
         asset: 10_000_000_000,
         fee: 5_000_000,
         expiry: 0,
+    };
+    let outputs_grin = grin::SpecialOutputs {
         fund_input_key: grin_funder_secret_init.fund_input_key.public_key,
         redeem_output_key: grin_redeemer_secret_init.redeem_output_key.public_key,
         refund_output_key: grin_funder_secret_init.refund_output_key.public_key,
+        // TODO: Figure out how to generate the common nonce properly
         bulletproof_common_nonce: random_secret_key(),
     };
 
+    let offer_bitcoin = bitcoin::Offer {
+        asset: 100_000_000,
+        fee: 1_000,
+        expiry: 0,
+    };
+    let outputs_bitcoin = bitcoin::WalletOutputs {
+        fund_input: alice_alpha_wallet.fund_input(),
+        fund_change_address: alice_alpha_wallet.change_output_address(),
+        redeem_address: bob_alpha_wallet.redeem_output_address(),
+        refund_address: alice_alpha_wallet.refund_output_address(),
+    };
+
     let (alice0, message0) = Alice0::<bitcoin::AliceFunder0, grin::AliceRedeemer0>::new(
-        base_parameters_bitcoin.clone(),
-        base_parameters_grin.clone(),
+        offer_bitcoin.clone(),
+        outputs_bitcoin.clone(),
+        offer_grin.clone(),
+        outputs_grin.clone(),
         grin_redeemer_secret_init,
     )?;
 
     let (bob0, message1) = Bob0::<bitcoin::BobRedeemer0, grin::BobFunder0>::new(
-        base_parameters_bitcoin.clone(),
-        base_parameters_grin.clone(),
+        offer_bitcoin.clone(),
+        outputs_bitcoin,
+        offer_grin.clone(),
+        outputs_grin,
         grin_funder_secret_init,
         message0,
     )?;
@@ -89,14 +98,12 @@ fn main() -> anyhow::Result<()> {
     // Verify that alice gets the agreed upon grin
     assert_eq!(
         alice_beta_wallet.get_balance()?,
-        alice_beta_starting_balance + base_parameters_grin.asset
+        alice_beta_starting_balance + offer_grin.asset
     );
 
     // Verify that bob gets the agreed upon bitcoin
-    assert!(bob_alpha_wallet.verify_payment_to_redeem_output_address(
-        alpha_redeem_txid,
-        base_parameters_bitcoin.asset
-    )?);
+    assert!(bob_alpha_wallet
+        .verify_payment_to_redeem_output_address(alpha_redeem_txid, offer_bitcoin.asset)?);
 
     grin::Wallets::clean_up();
     bitcoin_node.kill()?;

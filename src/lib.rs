@@ -20,28 +20,3 @@ pub use look_for::LookFor;
 pub trait Hash {
     fn hash(&self) -> [u8; 64];
 }
-
-// pub trait Sign {
-//     type BaseParameters;
-
-//     type SKs;
-//     type PKs;
-
-//     type RedeemerSigs;
-//     type FunderActions;
-//     type EncSig;
-
-//     fn funder(
-//         init: &Self::BaseParameters,
-//         funder_SKs: &Self::SKs,
-//         redeemer_PKs: &Self::PKs,
-//         Y: &PublicKey,
-//     ) -> (Self::FunderActions, Self::EncSig);
-
-//     fn redeemer(
-//         init: &Self::BaseParameters,
-//         funder_PKs: &Self::PKs,
-//         redeemer_SKs: &Self::SKs,
-//         Y: &PublicKey,
-//     ) -> Self::RedeemerSigs;
-// }

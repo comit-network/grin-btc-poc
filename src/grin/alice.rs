@@ -1,8 +1,8 @@
 use crate::{
     grin::{
-        action, bulletproof, normalize_redeem_keys_alice, BaseParameters, EncryptedSignature,
-        Funder0, Funder1, Funder2, FunderSecret, KeyPair, PKs, Redeemer0, Redeemer1, Redeemer2,
-        RedeemerSecret, RedeemerSigs,
+        action, bulletproof, normalize_redeem_keys_alice, EncryptedSignature, Funder0, Funder1,
+        Funder2, FunderSecret, KeyPair, Offer, PKs, Redeemer0, Redeemer1, Redeemer2,
+        RedeemerSecret, RedeemerSigs, SpecialOutputs,
     },
     PublicKey,
 };
@@ -15,8 +15,12 @@ pub struct AliceFunder0 {
 }
 
 impl AliceFunder0 {
-    pub fn new(base_parameters: BaseParameters, secret_init: FunderSecret) -> anyhow::Result<Self> {
-        let common = Funder0::new(base_parameters, secret_init);
+    pub fn new(
+        offer: Offer,
+        special_outputs: SpecialOutputs,
+        secret_init: FunderSecret,
+    ) -> anyhow::Result<Self> {
+        let common = Funder0::new(offer, special_outputs, secret_init);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
@@ -38,7 +42,8 @@ impl AliceFunder0 {
         )?;
 
         Ok(AliceFunder1(Funder1 {
-            base_parameters: self.common.base_parameters,
+            offer: self.common.offer,
+            special_outputs: self.common.special_outputs,
             secret_init: self.common.secret_init,
             SKs_self: self.common.SKs_self,
             PKs_other,
@@ -75,10 +80,11 @@ pub struct AliceRedeemer0 {
 
 impl AliceRedeemer0 {
     pub fn new(
-        base_parameters: BaseParameters,
+        offer: Offer,
+        special_outputs: SpecialOutputs,
         secret_init: RedeemerSecret,
     ) -> anyhow::Result<Self> {
-        let common = Redeemer0::new(base_parameters, secret_init);
+        let common = Redeemer0::new(offer, special_outputs, secret_init);
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {

@@ -88,10 +88,10 @@ mod test {
     #[test]
     fn prove_and_verify() {
         let x = random_secret_key();
-        let mut Gx = G.clone();
+        let mut Gx = *G;
         Gx.mul_assign(&*SECP, &x).unwrap();
 
-        let mut H = G.clone();
+        let mut H = *G;
         H.mul_assign(&*SECP, &random_secret_key()).unwrap();
 
         let mut Hx = H;

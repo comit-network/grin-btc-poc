@@ -372,7 +372,7 @@ mod test {
         let R_hat = PublicKey::from_combination(&*SECP, vec![&r0.public_key, &r1.public_key])?;
         let sig = decsig(&y, &encsig, &R_hat)?;
 
-        let rec_key = RecoveryKey::try_from(encsig.clone())?;
+        let rec_key = RecoveryKey::try_from(encsig)?;
         let y_tag = recover(&sig, &rec_key)?;
 
         assert_eq!(y.secret_key, y_tag.secret_key);

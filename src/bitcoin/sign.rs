@@ -1,8 +1,8 @@
 use crate::{
     bitcoin::{
-        self, action,
+        action,
         transaction::{fund_transaction, redeem_transaction, refund_transaction},
-        PKs, SKs,
+        Offer, PKs, SKs, WalletOutputs,
     },
     ecdsa,
     keypair::{self, PublicKey},
@@ -13,14 +13,19 @@ use secp256k1zkp::{self, Message};
 // TODO: Remove Y from spec version
 // TODO: Remove redeem signature from output in spec
 pub fn redeemer(
-    init: &bitcoin::BaseParameters,
+    offer: &Offer,
+    wallet_outputs: &WalletOutputs,
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
-) -> secp256k1zkp::Signature {
-    let (fund_transaction, fund_output_script) =
-        fund_transaction(&init, &redeemer_SKs.x.public_key, &funder_PKs.X);
+) -> anyhow::Result<secp256k1zkp::Signature> {
+    let (fund_transaction, fund_output_script) = fund_transaction(
+        &offer,
+        &wallet_outputs,
+        &redeemer_SKs.x.public_key,
+        &funder_PKs.X,
+    )?;
 
-    let refund_transaction = refund_transaction(&init, fund_transaction.txid());
+    let refund_transaction = refund_transaction(&offer, &wallet_outputs, fund_transaction.txid());
 
     let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
         &refund_transaction.input[0],
@@ -30,7 +35,7 @@ pub fn redeemer(
     let refund_digest = Message::from_slice(&refund_digest.into_inner())
         .expect("should not fail because it is a hash");
 
-    redeemer_SKs.x.sign_ecdsa(&refund_digest)
+    Ok(redeemer_SKs.x.sign_ecdsa(&refund_digest))
 }
 
 pub struct FunderActions {
@@ -40,21 +45,27 @@ pub struct FunderActions {
 
 // TODO: Modify the spec to not pass redeemer's redeem signature to funder
 pub fn funder(
-    base_parameters: &bitcoin::BaseParameters,
+    offer: &Offer,
+    wallet_outputs: &WalletOutputs,
     funder_SKs: &SKs,
     redeemer_PKs: &PKs,
     Y: &PublicKey,
     redeemer_refund_signature: &secp256k1zkp::Signature,
 ) -> anyhow::Result<(FunderActions, ecdsa::EncryptedSignature)> {
-    let (fund_transaction, fund_output_script) =
-        fund_transaction(&base_parameters, &redeemer_PKs.X, &funder_SKs.x.public_key);
+    let (fund_transaction, fund_output_script) = fund_transaction(
+        &offer,
+        &wallet_outputs,
+        &redeemer_PKs.X,
+        &funder_SKs.x.public_key,
+    )?;
 
     let fund = action::Fund {
         transaction: fund_transaction.clone(),
     };
 
     let refund = {
-        let refund_transaction = refund_transaction(&base_parameters, fund_transaction.txid());
+        let refund_transaction =
+            refund_transaction(&offer, &wallet_outputs, fund_transaction.txid());
 
         let refund_digest = SighashComponents::new(&refund_transaction).sighash_all(
             &refund_transaction.input[0],
@@ -80,7 +91,8 @@ pub fn funder(
     };
 
     let encrypted_redeem_signature = {
-        let redeem_transaction = redeem_transaction(&base_parameters, fund_transaction.txid());
+        let redeem_transaction =
+            redeem_transaction(&offer, &wallet_outputs, fund_transaction.txid());
         let redeem_digest = SighashComponents::new(&redeem_transaction).sighash_all(
             &redeem_transaction.input[0],
             &fund_output_script,

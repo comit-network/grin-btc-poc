@@ -105,7 +105,7 @@ fn recover_from_schnorr_to_decrypt_ecdsa() -> anyhow::Result<()> {
     let R_hat = PublicKey::from_combination(&*SECP, vec![&r0.public_key, &r1.public_key]).unwrap();
     let schnorr_sig = schnorr::decsig(&y, &schnorr_encsig, &R_hat)?;
 
-    let rec_key = schnorr::RecoveryKey::try_from(schnorr_encsig.clone())?;
+    let rec_key = schnorr::RecoveryKey::try_from(schnorr_encsig)?;
     let y_tag = schnorr::recover(&schnorr_sig, &rec_key)?;
 
     let ecdsa_sig = ecdsa::decsig(&y_tag, &ecdsa_encsig);

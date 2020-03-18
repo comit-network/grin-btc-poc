@@ -15,19 +15,22 @@ pub struct Bob0<AL, BL> {
 
 impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
     pub fn new(
-        base_parameters_grin: grin::BaseParameters,
-        base_parameters_bitcoin: bitcoin::BaseParameters,
+        offer_grin: grin::Offer,
+        outputs_grin: grin::SpecialOutputs,
+        offer_bitcoin: bitcoin::Offer,
+        outputs_bitcoin: bitcoin::WalletOutputs,
         secret_init_grin: RedeemerSecret,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<grin::PKs, bitcoin::PKs>)> {
         let alice_commitment = message.commitment;
 
         let grin_state = grin::bob::BobRedeemer0::new(
-            base_parameters_grin,
+            offer_grin,
+            outputs_grin,
             secret_init_grin,
             message.bulletproof_round_1_alice,
         )?;
-        let bitcoin_state = bitcoin::bob::BobFunder0::new(base_parameters_bitcoin);
+        let bitcoin_state = bitcoin::bob::BobFunder0::new(offer_bitcoin, outputs_bitcoin);
 
         Ok(Bob0::state_and_message(
             grin_state.clone(),
@@ -37,6 +40,7 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         ))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn receive(
         self,
         Message2 {
@@ -75,16 +79,19 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
 
 impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
     pub fn new(
-        base_parameters_bitcoin: bitcoin::BaseParameters,
-        base_parameters_grin: grin::BaseParameters,
+        offer_bitcoin: bitcoin::Offer,
+        outputs_bitcoin: bitcoin::WalletOutputs,
+        offer_grin: grin::Offer,
+        outputs_grin: grin::SpecialOutputs,
         secret_init_grin: FunderSecret,
         message: Message0,
     ) -> anyhow::Result<(Self, Message1<bitcoin::PKs, grin::PKs>)> {
         let alice_commitment = message.commitment;
 
-        let bitcoin_state = bitcoin::bob::BobRedeemer0::new(base_parameters_bitcoin);
+        let bitcoin_state = bitcoin::bob::BobRedeemer0::new(offer_bitcoin, outputs_bitcoin);
         let grin_state = grin::bob::BobFunder0::new(
-            base_parameters_grin,
+            offer_grin,
+            outputs_grin,
             secret_init_grin,
             message.bulletproof_round_1_alice,
         )?;
@@ -110,7 +117,7 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         let (alice_PKs_bitcoin, alice_PKs_grin, Y) = opening.open(self.alice_commitment)?;
 
         let (bitcoin_state, bitcoin_redeemer_refund_sig) =
-            self.alpha_state.transition(alice_PKs_bitcoin.try_into()?);
+            self.alpha_state.transition(alice_PKs_bitcoin.try_into()?)?;
         let (grin_state, grin_redeem_encsig) = self.beta_state.transition(
             alice_PKs_grin.try_into()?,
             alice_grin_redeemer_sigs.0,
@@ -189,7 +196,7 @@ impl Bob1<bitcoin::BobRedeemer1, grin::BobFunder1> {
         message: Message4<bitcoin::EncryptedSignature>,
     ) -> anyhow::Result<Bob2<bitcoin::BobRedeemer2, grin::BobFunder2>> {
         // Produce encrypted redeem action
-        let bitcoin_state = self.alpha_state.transition(message.alpha_redeem_encsig);
+        let bitcoin_state = self.alpha_state.transition(message.alpha_redeem_encsig)?;
 
         // Add grin redeem event to state
         let grin_state = self.beta_state.transition()?;

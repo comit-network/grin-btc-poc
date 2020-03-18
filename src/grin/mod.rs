@@ -4,21 +4,23 @@ use sha2::{Digest, Sha256};
 
 pub mod action;
 pub mod alice;
-pub mod base_parameters;
 pub mod bob;
 pub mod bulletproof;
 pub mod event;
 pub mod keys;
+pub mod offer;
 pub mod sign;
+pub mod special_outputs;
 pub mod wallet;
 
 pub use crate::{
     grin::{
         alice::*,
-        base_parameters::BaseParameters,
         bob::*,
         keys::{PKs, SKs},
+        offer::Offer,
         sign::FunderActions,
+        special_outputs::SpecialOutputs,
         wallet::{Wallet, Wallets},
     },
     schnorr::EncryptedSignature,
@@ -32,18 +34,19 @@ pub use sign::RedeemerSigs;
 
 #[derive(Clone)]
 pub struct Funder0 {
-    // TODO: Split into Offer and SpecialOutputPKs
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub special_outputs: SpecialOutputs,
     pub secret_init: FunderSecret,
     pub SKs_self: SKs,
 }
 
 impl Funder0 {
-    pub fn new(base_parameters: BaseParameters, secret_init: FunderSecret) -> Self {
+    pub fn new(offer: Offer, special_outputs: SpecialOutputs, secret_init: FunderSecret) -> Self {
         let SKs_self = keygen();
 
         Self {
-            base_parameters,
+            offer,
+            special_outputs,
             secret_init,
             SKs_self,
         }
@@ -51,7 +54,8 @@ impl Funder0 {
 }
 
 pub struct Funder1 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub special_outputs: SpecialOutputs,
     pub secret_init: FunderSecret,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
@@ -67,7 +71,8 @@ impl Funder1 {
         bulletproof_round_2_other: bulletproof::Round2,
     ) -> anyhow::Result<(Funder2, EncryptedSignature)> {
         let (FunderActions { fund, refund }, redeem_encsig) = sign::funder(
-            &self.base_parameters,
+            &self.offer,
+            &self.special_outputs,
             &self.secret_init,
             &self.SKs_self,
             &self.PKs_other,
@@ -94,17 +99,19 @@ pub struct Funder2 {
 
 #[derive(Clone)]
 pub struct Redeemer0 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub special_outputs: SpecialOutputs,
     pub secret_init: RedeemerSecret,
     pub SKs_self: SKs,
 }
 
 impl Redeemer0 {
-    pub fn new(base_parameters: BaseParameters, secret_init: RedeemerSecret) -> Self {
+    pub fn new(offer: Offer, special_outputs: SpecialOutputs, secret_init: RedeemerSecret) -> Self {
         let SKs_self = keygen();
 
         Self {
-            base_parameters,
+            offer,
+            special_outputs,
             secret_init,
             SKs_self,
         }
@@ -112,7 +119,8 @@ impl Redeemer0 {
 }
 
 pub struct Redeemer1 {
-    pub base_parameters: BaseParameters,
+    pub offer: Offer,
+    pub special_outputs: SpecialOutputs,
     pub secret_init: RedeemerSecret,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
@@ -127,7 +135,8 @@ impl Redeemer1 {
         Y: PublicKey,
     ) -> anyhow::Result<(Self, RedeemerSigs, bulletproof::Round2)> {
         let (redeemer_sigs, bulletproof_round_2_self) = sign::redeemer(
-            &prev_state.base_parameters,
+            &prev_state.offer,
+            &prev_state.special_outputs,
             &prev_state.secret_init,
             &prev_state.SKs_self,
             &PKs_other,
@@ -137,7 +146,8 @@ impl Redeemer1 {
         )?;
 
         let state = Redeemer1 {
-            base_parameters: prev_state.base_parameters,
+            offer: prev_state.offer,
+            special_outputs: prev_state.special_outputs,
             secret_init: prev_state.secret_init,
             SKs_self: prev_state.SKs_self,
             PKs_other,
@@ -152,7 +162,8 @@ impl Redeemer1 {
         redeem_encsig: EncryptedSignature,
     ) -> anyhow::Result<Redeemer2> {
         let encrypted_redeem_action = action::EncryptedRedeem::new(
-            self.base_parameters,
+            self.offer,
+            self.special_outputs,
             self.secret_init,
             self.SKs_self,
             self.PKs_other,

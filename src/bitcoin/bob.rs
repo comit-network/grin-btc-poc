@@ -1,7 +1,7 @@
 use crate::{
     bitcoin::{
-        action, event, sign::FunderActions, BaseParameters, EncryptedSignature, Funder0, Funder1,
-        PKs, PublicKey, Redeemer0, Redeemer1, Signature,
+        action, event, sign::FunderActions, wallet_outputs::WalletOutputs, EncryptedSignature,
+        Funder0, Funder1, Offer, PKs, PublicKey, Redeemer0, Redeemer1, Signature,
     },
     ecdsa::{self, RecoveryKey},
 };
@@ -10,8 +10,8 @@ use crate::{
 pub struct BobFunder0(pub Funder0);
 
 impl BobFunder0 {
-    pub fn new(base_parameters: BaseParameters) -> Self {
-        Self(Funder0::new(base_parameters))
+    pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
+        Self(Funder0::new(offer, wallet_outputs))
     }
 
     pub fn transition(
@@ -48,7 +48,8 @@ pub struct BobFunder1 {
 impl BobFunder1 {
     pub fn transition(self) -> anyhow::Result<BobFunder2> {
         let redeem_event = event::Redeem::new(
-            &self.common.base_parameters,
+            &self.common.offer,
+            &self.common.wallet_outputs,
             &self.common.PKs_other,
             &self.common.SKs_self.into(),
         )?;
@@ -73,31 +74,32 @@ pub struct BobFunder2 {
 pub struct BobRedeemer0(pub Redeemer0);
 
 impl BobRedeemer0 {
-    pub fn new(base_parameters: BaseParameters) -> Self {
-        Self(Redeemer0::new(base_parameters))
+    pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
+        Self(Redeemer0::new(offer, wallet_outputs))
     }
 
-    pub fn transition(self, PKs_other: PKs) -> (BobRedeemer1, Signature) {
-        let (state, redeemer_refund_sig) = self.0.transition(PKs_other);
+    pub fn transition(self, PKs_other: PKs) -> anyhow::Result<(BobRedeemer1, Signature)> {
+        let (state, redeemer_refund_sig) = self.0.transition(PKs_other)?;
 
-        (BobRedeemer1(state), redeemer_refund_sig)
+        Ok((BobRedeemer1(state), redeemer_refund_sig))
     }
 }
 
 pub struct BobRedeemer1(pub Redeemer1);
 
 impl BobRedeemer1 {
-    pub fn transition(self, redeem_encsig: EncryptedSignature) -> BobRedeemer2 {
+    pub fn transition(self, redeem_encsig: EncryptedSignature) -> anyhow::Result<BobRedeemer2> {
         let encrypted_redeem_action = action::EncryptedRedeem::new(
-            &self.0.base_parameters,
+            &self.0.offer,
+            &self.0.wallet_outputs,
             &self.0.SKs_self,
             &self.0.PKs_other,
             redeem_encsig,
-        );
+        )?;
 
-        BobRedeemer2 {
+        Ok(BobRedeemer2 {
             encrypted_redeem_action,
-        }
+        })
     }
 }
 
