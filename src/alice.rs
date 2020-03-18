@@ -1,16 +1,16 @@
 use crate::{
     bitcoin,
     commit::{Commitment, Opening},
-    grin, keypair,
+    grin,
     messages::{Message0, Message1, Message2, Message3, Message4},
-    PublicKey,
+    KeyPair, PublicKey,
 };
 use grin::bulletproof;
 
 pub struct Alice0<AL, BL> {
     alpha_state: AL,
     beta_state: BL,
-    y: keypair::KeyPair,
+    y: KeyPair,
 }
 
 impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
@@ -39,13 +39,10 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
         Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1>,
         Message2<bitcoin::Signature>,
     )> {
-        // Creating the opening must happen before transitioning Grin, because some keys
-        // may be modified
-        let opening = Opening::new(
-            self.alpha_state.clone().into(),
-            self.beta_state.clone().into(),
-            self.y.public_key,
-        );
+        // Building the opening must happen now, because some keys may change when
+        // transitioning Grin's state and Alice has already committed to the original
+        // ones
+        let opening = self.opening();
 
         let grin_state = self.alpha_state.transition(
             message.PKs_alpha,
@@ -99,11 +96,10 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
         Alice1<bitcoin::AliceFunder1, grin::AliceRedeemer1>,
         Message2<(grin::RedeemerSigs, grin::bulletproof::Round2)>,
     )> {
-        let opening = Opening::new(
-            self.alpha_state.clone().into(),
-            self.beta_state.clone().into(),
-            self.y.public_key,
-        );
+        // Building the opening must happen now, because some keys may change when
+        // transitioning Grin's state and Alice has already committed to the original
+        // ones
+        let opening = self.opening();
 
         let bitcoin_state = self.alpha_state.transition(message.PKs_alpha);
         let (grin_state, grin_redeemer_sigs, bulletproof_round_2_alice) =
@@ -137,7 +133,7 @@ impl<A, B> Alice0<A, B> {
         A: Into<Vec<PublicKey>> + Clone,
         B: Into<Vec<PublicKey>> + Clone,
     {
-        let y = keypair::KeyPair::new_random();
+        let y = KeyPair::new_random();
 
         let commitment = Commitment::commit(
             alpha_state.clone().into(),
@@ -158,12 +154,24 @@ impl<A, B> Alice0<A, B> {
 
         (state, message)
     }
+
+    pub fn opening(&self) -> Opening
+    where
+        A: Into<Vec<PublicKey>> + Clone,
+        B: Into<Vec<PublicKey>> + Clone,
+    {
+        Opening::new(
+            self.alpha_state.clone().into(),
+            self.beta_state.clone().into(),
+            self.y.public_key,
+        )
+    }
 }
 
 pub struct Alice1<AL, BL> {
     alpha_state: AL,
     beta_state: BL,
-    y: keypair::KeyPair,
+    y: KeyPair,
 }
 
 impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
