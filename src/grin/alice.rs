@@ -105,8 +105,7 @@ impl AliceRedeemer0 {
             &mut y,
         )?;
 
-        let (state, redeemer_sigs, bulletproof_round_2_self) = Redeemer1::new(
-            self.common,
+        let (state, redeemer_sigs, bulletproof_round_2_self) = self.common.transition(
             self.bulletproof_round_1_self.clone(),
             bulletproof_round_1_other.clone(),
             PKs_other,

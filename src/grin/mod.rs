@@ -124,6 +124,35 @@ impl Redeemer0 {
             SKs_self,
         }
     }
+
+    pub fn transition(
+        self,
+        bulletproof_round_1_self: bulletproof::Round1,
+        bulletproof_round_1_other: bulletproof::Round1,
+        PKs_other: PKs,
+        Y: PublicKey,
+    ) -> anyhow::Result<(Redeemer1, RedeemerSigs, bulletproof::Round2)> {
+        let (redeemer_sigs, bulletproof_round_2_self) = sign::redeemer(
+            &self.offer,
+            &self.special_outputs,
+            &self.special_output_keypairs_redeemer,
+            &self.SKs_self,
+            &PKs_other,
+            &Y,
+            &bulletproof_round_1_self,
+            &bulletproof_round_1_other,
+        )?;
+
+        let state = Redeemer1 {
+            offer: self.offer,
+            special_outputs: self.special_outputs,
+            special_output_keypairs_redeemer: self.special_output_keypairs_redeemer,
+            SKs_self: self.SKs_self,
+            PKs_other,
+        };
+
+        Ok((state, redeemer_sigs, bulletproof_round_2_self))
+    }
 }
 
 pub struct Redeemer1 {
@@ -135,35 +164,6 @@ pub struct Redeemer1 {
 }
 
 impl Redeemer1 {
-    pub fn new(
-        prev_state: Redeemer0,
-        bulletproof_round_1_self: bulletproof::Round1,
-        bulletproof_round_1_other: bulletproof::Round1,
-        PKs_other: PKs,
-        Y: PublicKey,
-    ) -> anyhow::Result<(Self, RedeemerSigs, bulletproof::Round2)> {
-        let (redeemer_sigs, bulletproof_round_2_self) = sign::redeemer(
-            &prev_state.offer,
-            &prev_state.special_outputs,
-            &prev_state.special_output_keypairs_redeemer,
-            &prev_state.SKs_self,
-            &PKs_other,
-            &Y,
-            &bulletproof_round_1_self,
-            &bulletproof_round_1_other,
-        )?;
-
-        let state = Redeemer1 {
-            offer: prev_state.offer,
-            special_outputs: prev_state.special_outputs,
-            special_output_keypairs_redeemer: prev_state.special_output_keypairs_redeemer,
-            SKs_self: prev_state.SKs_self,
-            PKs_other,
-        };
-
-        Ok((state, redeemer_sigs, bulletproof_round_2_self))
-    }
-
     pub fn transition(
         self,
         Y: PublicKey,

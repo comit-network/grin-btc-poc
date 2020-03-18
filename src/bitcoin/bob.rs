@@ -20,7 +20,7 @@ impl BobFunder0 {
         redeemer_refund_sig: Signature,
         Y: &PublicKey,
     ) -> anyhow::Result<(BobFunder1, EncryptedSignature)> {
-        let state = Funder1::new(self.0, PKs_other);
+        let state = self.0.transition(PKs_other);
 
         let (FunderActions { fund, refund }, redeem_encsig) =
             state.clone().sign(Y, redeemer_refund_sig)?;

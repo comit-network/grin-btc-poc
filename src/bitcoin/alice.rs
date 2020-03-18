@@ -16,7 +16,7 @@ impl AliceFunder0 {
     }
 
     pub fn transition(self, PKs_other: PKs) -> AliceFunder1 {
-        AliceFunder1(Funder1::new(self.0, PKs_other))
+        AliceFunder1(self.0.transition(PKs_other))
     }
 }
 

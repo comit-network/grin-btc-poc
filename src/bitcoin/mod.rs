@@ -49,6 +49,15 @@ impl Funder0 {
             SKs_self,
         }
     }
+
+    pub fn transition(self, PKs_other: PKs) -> Funder1 {
+        Funder1 {
+            offer: self.offer,
+            wallet_outputs: self.wallet_outputs,
+            SKs_self: self.SKs_self,
+            PKs_other,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -60,15 +69,6 @@ pub struct Funder1 {
 }
 
 impl Funder1 {
-    pub fn new(prev_state: Funder0, PKs_other: PKs) -> Self {
-        Funder1 {
-            offer: prev_state.offer,
-            wallet_outputs: prev_state.wallet_outputs,
-            SKs_self: prev_state.SKs_self,
-            PKs_other,
-        }
-    }
-
     pub fn sign(
         self,
         Y: &PublicKey,
