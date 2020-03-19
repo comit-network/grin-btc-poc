@@ -1,10 +1,11 @@
-use crate::{bitcoin::sign::FunderActions, KeyPair};
+use crate::bitcoin::sign::FunderActions;
 
 pub mod action;
 pub mod alice;
 pub mod bob;
 pub mod client;
 pub mod event;
+pub mod keygen;
 pub mod keys;
 pub mod node;
 pub mod offer;
@@ -17,6 +18,7 @@ pub use crate::{
     bitcoin::{
         alice::*,
         bob::*,
+        keygen::keygen,
         keys::{PKs, SKs},
         offer::Offer,
         wallet_outputs::WalletOutputs,
@@ -139,10 +141,4 @@ pub struct Redeemer1 {
 
 pub struct Redeemer2 {
     pub encrypted_redeem_action: action::EncryptedRedeem,
-}
-
-pub fn keygen() -> SKs {
-    let x = KeyPair::new_random();
-
-    SKs { x }
 }

@@ -7,6 +7,7 @@ pub mod alice;
 pub mod bob;
 pub mod bulletproof;
 pub mod event;
+pub mod keygen;
 pub mod keys;
 pub mod offer;
 pub mod sign;
@@ -17,6 +18,7 @@ pub use crate::{
     grin::{
         alice::*,
         bob::*,
+        keygen::keygen,
         keys::{PKs, SKs},
         offer::Offer,
         sign::FunderActions,
@@ -187,21 +189,6 @@ impl Redeemer1 {
 
 pub struct Redeemer2 {
     pub encrypted_redeem_action: action::EncryptedRedeem,
-}
-
-fn keygen() -> SKs {
-    let x = KeyPair::new_random();
-
-    let r_fund = KeyPair::new_random();
-    let r_redeem = KeyPair::new_random();
-    let r_refund = KeyPair::new_random();
-
-    SKs {
-        x,
-        r_fund,
-        r_redeem,
-        r_refund,
-    }
 }
 
 pub fn compute_excess_sk(
