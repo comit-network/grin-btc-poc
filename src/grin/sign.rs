@@ -228,7 +228,6 @@ pub fn funder(
             (
                 offer.fund_output_amount(),
                 special_output_keypairs_funder.fund_input_key.clone(),
-                offer.fee,
             ),
         )?
     };
@@ -261,7 +260,7 @@ pub fn funder(
         .map_err(|_| RedeemerSignatureError::Refund)?;
 
         let bulletproof = SECP.bullet_proof(
-            offer.refund_output_amount(),
+            offer.fund_output_amount(),
             special_output_keypairs_funder
                 .refund_output_key
                 .secret_key
@@ -275,7 +274,7 @@ pub fn funder(
         action::Refund::new(
             vec![(offer.fund_output_amount(), X)],
             vec![(
-                offer.refund_output_amount(),
+                offer.fund_output_amount(),
                 special_output_keypairs_funder.refund_output_key.public_key,
                 bulletproof,
             )],
@@ -283,7 +282,11 @@ pub fn funder(
             excess_sig,
             kernel_features,
             offset,
-            special_output_keypairs_funder.refund_output_key.clone(),
+            (
+                offer.fund_output_amount(),
+                special_output_keypairs_funder.refund_output_key.clone(),
+            ),
+            offer.fee,
         )?
     };
 

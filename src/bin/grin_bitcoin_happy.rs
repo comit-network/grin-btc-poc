@@ -4,13 +4,13 @@ use grin_btc_poc::{
 
 fn main() -> anyhow::Result<()> {
     // Set up Grin wallets
-    // TODO: Do it more like Bitcoin
-    let alpha_wallets = grin::Wallets::initialize()?;
-
-    let alice_alpha_wallet = &alpha_wallets.0[0];
-    alice_alpha_wallet.award_60_grin()?;
-
-    let bob_alpha_wallet = &alpha_wallets.0[1];
+    let (
+        grin_node,
+        grin::Wallets {
+            funder_wallet: alice_alpha_wallet,
+            redeemer_wallet: bob_alpha_wallet,
+        },
+    ) = grin::Node::start()?;
 
     let bob_alpha_starting_balance = bob_alpha_wallet.get_balance()?;
 
@@ -103,7 +103,7 @@ fn main() -> anyhow::Result<()> {
     alpha_redeem_action.execute(&bob_alpha_wallet)?;
 
     // Verify that alice gets the agreed upon bitcoin
-    assert!(alice_beta_wallet.verify_payment_to_redeem_output_address(
+    assert!(alice_beta_wallet.verify_payment_to_address(
         alice2.beta_state.redeem_action.transaction.txid(),
         offer_bitcoin.asset
     )?);
@@ -116,7 +116,7 @@ fn main() -> anyhow::Result<()> {
 
     // Clean-up
 
-    grin::Wallets::clean_up();
+    grin_node.kill();
     bitcoin_node.kill()?;
     Ok(())
 }

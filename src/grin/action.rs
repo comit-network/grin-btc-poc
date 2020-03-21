@@ -1,8 +1,8 @@
 use crate::{
     grin::{
-        self, compute_excess_pk, compute_excess_sk, compute_offset,
+        compute_excess_pk, compute_excess_sk, compute_offset,
         wallet::{build_input, build_output},
-        Offer, PKs, SKs, SpecialOutputKeyPairsRedeemer, SpecialOutputs,
+        Offer, PKs, SKs, SpecialOutputKeyPairsRedeemer, SpecialOutputs, Wallet,
     },
     keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
     schnorr, Execute,
@@ -16,7 +16,7 @@ use std::convert::TryInto;
 
 pub struct Fund {
     transaction_from_special_input: Transaction,
-    special_input: (u64, KeyPair, u64),
+    special_input: (u64, KeyPair),
 }
 
 impl Fund {
@@ -27,7 +27,7 @@ impl Fund {
         excess_sig: Signature,
         kernel_features: KernelFeatures,
         offset: SecretKey,
-        special_input: (u64, KeyPair, u64),
+        special_input: (u64, KeyPair),
     ) -> anyhow::Result<Self> {
         Ok(Self {
             transaction_from_special_input: new_transaction(
@@ -46,10 +46,12 @@ impl Fund {
 
 pub struct Refund {
     transaction_to_special_output: Transaction,
-    special_output: KeyPair,
+    special_output: (u64, KeyPair),
+    wallet_transaction_fee: u64,
 }
 
 impl Refund {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         inputs: Vec<(u64, PublicKey)>,
         outputs: Vec<(u64, PublicKey, RangeProof)>,
@@ -57,7 +59,8 @@ impl Refund {
         excess_sig: Signature,
         kernel_features: KernelFeatures,
         offset: SecretKey,
-        special_output: KeyPair,
+        special_output: (u64, KeyPair),
+        wallet_transaction_fee: u64,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             transaction_to_special_output: new_transaction(
@@ -70,6 +73,7 @@ impl Refund {
             )
             .context("refund")?,
             special_output,
+            wallet_transaction_fee,
         })
     }
 }
@@ -77,7 +81,8 @@ impl Refund {
 pub struct EncryptedRedeem {
     incomplete_transaction_to_special_output:
         Box<dyn FnOnce(Signature) -> anyhow::Result<Transaction>>,
-    special_output: (u64, KeyPair, u64),
+    special_output: (u64, KeyPair),
+    wallet_transaction_fee: u64,
     encsig: schnorr::EncryptedSignature,
     R_hat: PublicKey,
 }
@@ -184,8 +189,8 @@ impl EncryptedRedeem {
             special_output: (
                 offer.fund_output_amount(),
                 special_output_keypairs_redeemer.redeem_output_key,
-                offer.fee,
             ),
+            wallet_transaction_fee: offer.fee,
             encsig,
             R_hat,
         })
@@ -200,6 +205,7 @@ impl EncryptedRedeem {
         Ok(Redeem {
             transaction_to_special_output,
             special_output: self.special_output,
+            wallet_transaction_fee: self.wallet_transaction_fee,
         })
     }
 }
@@ -207,7 +213,8 @@ impl EncryptedRedeem {
 #[derive(Debug)]
 pub struct Redeem {
     transaction_to_special_output: Transaction,
-    special_output: (u64, KeyPair, u64),
+    special_output: (u64, KeyPair),
+    wallet_transaction_fee: u64,
 }
 
 fn new_transaction(
@@ -264,9 +271,10 @@ fn new_transaction(
 }
 
 impl Execute for Fund {
-    type Wallet = grin::Wallet;
+    type Wallet = Wallet;
+    type Return = u64;
 
-    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<()> {
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
         // Build invoice to pay to special output
         let (slate, r, blind_excess_keypair) = {
             let mut slate = Slate::blank(2);
@@ -339,64 +347,101 @@ impl Execute for Fund {
         ])
         .map_err(|e| anyhow::anyhow!("failed to aggregate fund transaction: {}", e))?;
 
-        wallet.post_transaction(aggregate_transaction)
+        let fee = aggregate_transaction.fee();
+        wallet.post_transaction(aggregate_transaction)?;
+
+        Ok(fee)
     }
 }
 
 impl Execute for Redeem {
-    type Wallet = grin::Wallet;
-    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<()> {
-        let mut slate = wallet.issue_invoice(self.special_output.0 - self.special_output.2)?;
-
-        slate.fee = self.special_output.2;
-        slate.update_kernel();
-
-        let special_input = build_input(self.special_output.0, &self.special_output.1.secret_key)?;
-        slate.tx = slate.tx.with_input(special_input);
-
-        let r = KeyPair::new_random();
-
-        let blind_excess =
-            compute_excess_sk(vec![&self.special_output.1.secret_key], vec![], None)?;
-        let blind_excess_keypair = KeyPair::new(blind_excess);
-
-        slate.participant_data.push(ParticipantData {
-            id: 0,
-            public_blind_excess: blind_excess_keypair.public_key,
-            public_nonce: r.public_key,
-            part_sig: None,
-            message: None,
-            message_sig: None,
-        });
-
-        let receiver_data = slate
-            .participant_data
-            .iter()
-            .find(|p| p.id == 1)
-            .ok_or_else(|| anyhow::anyhow!("missing sender data"))?;
-
-        let partial_sig = schnorr::sign_2p_0(
-            &blind_excess_keypair,
-            &r,
-            &receiver_data.public_blind_excess,
-            &receiver_data.public_nonce,
-            &KernelFeatures::Plain { fee: slate.fee }.kernel_sig_msg()?,
-        )?;
-
-        for p in slate.participant_data.iter_mut() {
-            if p.id == 0 {
-                p.part_sig = Some(partial_sig.to_signature(&r.public_key)?);
-            }
-        }
-
-        let transaction_from_special_input_to_redeemer_wallet = wallet.finalize_invoice(slate)?;
-
-        let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
+    type Wallet = Wallet;
+    type Return = u64;
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
+        aggregate_with_spending_transaction(
             self.transaction_to_special_output,
-            transaction_from_special_input_to_redeemer_wallet,
-        ])
-        .map_err(|e| anyhow::anyhow!("failed to aggregate fund transaction: {}", e))?;
-
-        wallet.post_transaction(aggregate_transaction)
+            self.special_output,
+            self.wallet_transaction_fee,
+            wallet,
+        )
     }
+}
+
+impl Execute for Refund {
+    type Wallet = Wallet;
+    type Return = u64;
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
+        aggregate_with_spending_transaction(
+            self.transaction_to_special_output,
+            self.special_output,
+            self.wallet_transaction_fee,
+            wallet,
+        )
+    }
+}
+
+pub fn aggregate_with_spending_transaction(
+    transaction_to_special_output: Transaction,
+    special_output: (u64, KeyPair),
+    wallet_transaction_fee: u64,
+    wallet: &Wallet,
+) -> anyhow::Result<u64> {
+    let mut slate = wallet.issue_invoice(special_output.0 - wallet_transaction_fee)?;
+
+    slate.fee = wallet_transaction_fee;
+    slate.update_kernel();
+
+    let special_input = build_input(special_output.0, &special_output.1.secret_key)?;
+    slate.tx = slate.tx.with_input(special_input);
+
+    let r = KeyPair::new_random();
+
+    let blind_excess = compute_excess_sk(vec![&special_output.1.secret_key], vec![], None)?;
+    let blind_excess_keypair = KeyPair::new(blind_excess);
+
+    slate.participant_data.push(ParticipantData {
+        id: 0,
+        public_blind_excess: blind_excess_keypair.public_key,
+        public_nonce: r.public_key,
+        part_sig: None,
+        message: None,
+        message_sig: None,
+    });
+
+    let receiver_data = slate
+        .participant_data
+        .iter()
+        .find(|p| p.id == 1)
+        .ok_or_else(|| anyhow::anyhow!("missing sender data"))?;
+
+    // The aggregate transaction will contain another kernel which will be height
+    // locked according to the expiry defined in the offer. Therefore, there is no
+    // need to height lock the kernel corresponding to the other transaction
+    // involved
+    let partial_sig = schnorr::sign_2p_0(
+        &blind_excess_keypair,
+        &r,
+        &receiver_data.public_blind_excess,
+        &receiver_data.public_nonce,
+        &KernelFeatures::Plain { fee: slate.fee }.kernel_sig_msg()?,
+    )?;
+
+    for p in slate.participant_data.iter_mut() {
+        if p.id == 0 {
+            p.part_sig = Some(partial_sig.to_signature(&r.public_key)?);
+        }
+    }
+
+    let transaction_from_special_input_to_wallet = wallet.finalize_invoice(slate)?;
+
+    let aggregate_transaction = grin_core::core::transaction::aggregate(vec![
+        transaction_to_special_output,
+        transaction_from_special_input_to_wallet,
+    ])
+    .map_err(|e| anyhow::anyhow!("failed to aggregate refund transaction: {}", e))?;
+
+    let fee = aggregate_transaction.fee();
+    wallet.post_transaction(aggregate_transaction)?;
+
+    Ok(fee)
 }

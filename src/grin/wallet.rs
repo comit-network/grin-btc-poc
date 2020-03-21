@@ -7,7 +7,9 @@ use grin_chain::Chain;
 use grin_core::core::{Input, Output, OutputFeatures, Transaction, TxKernel};
 use grin_util::ZeroingString;
 use grin_wallet_impls::{
-    test_framework::{award_blocks_to_wallet, wallet_info, LocalWalletClient, WalletProxy},
+    test_framework::{
+        award_block_to_wallet, award_blocks_to_wallet, wallet_info, LocalWalletClient, WalletProxy,
+    },
     DefaultLCProvider, DefaultWalletImpl,
 };
 use grin_wallet_libwallet::{InitTxArgs, IssueInvoiceTxArgs, NodeClient, Slate, WalletInst};
@@ -15,23 +17,24 @@ use grin_wallet_util::{grin_keychain::ExtKeychain, grin_util::Mutex};
 use secp256k1zkp::{pedersen::Commitment, SecretKey};
 use std::{sync::Arc, thread};
 
-lazy_static::lazy_static! {
-    static ref CHAIN_DIR: &'static str = "target/test_output/";
+pub struct Node {
+    chain_dir: String,
+    wallet: Wallet,
 }
 
-pub struct Wallets(pub Vec<Wallet>);
+impl Node {
+    pub fn start() -> anyhow::Result<(Self, Wallets)> {
+        let chain_dir = "target/test_output/";
 
-impl Wallets {
-    pub fn initialize() -> anyhow::Result<Self> {
-        let _ = std::fs::remove_dir_all(&*CHAIN_DIR);
+        let _ = std::fs::remove_dir_all(chain_dir);
         let mut wallet_proxy: WalletProxy<
             DefaultLCProvider<LocalWalletClient, ExtKeychain>,
             LocalWalletClient,
             ExtKeychain,
-        > = WalletProxy::new(&*CHAIN_DIR);
+        > = WalletProxy::new(chain_dir);
 
         let mut wallets = Vec::new();
-        for id in vec!["alice", "bob"].iter() {
+        for id in vec!["node", "funder", "redeemer"].iter() {
             let node_client = LocalWalletClient::new(id, wallet_proxy.tx.clone());
             let mut wallet = Box::new(
                 DefaultWalletImpl::<LocalWalletClient>::new(node_client.clone())
@@ -85,12 +88,54 @@ impl Wallets {
             }
         });
 
-        Ok(Self(wallets))
+        let node = Self {
+            chain_dir: String::from(chain_dir),
+            wallet: wallets.remove(0),
+        };
+
+        let funder_wallet = wallets.remove(0);
+        let redeemer_wallet = wallets.remove(0);
+
+        node.award_60_grin(&funder_wallet)?;
+
+        Ok((node, Wallets {
+            funder_wallet,
+            redeemer_wallet,
+        }))
     }
 
-    pub fn clean_up() {
-        let _ = std::fs::remove_dir_all(&*CHAIN_DIR);
+    // 1 block reward (60 grin) is spendable after 4 blocks have been mined
+    fn award_60_grin(&self, wallet: &Wallet) -> anyhow::Result<()> {
+        award_block_to_wallet(
+            wallet.chain.as_ref(),
+            Vec::new(),
+            wallet.inner.clone(),
+            wallet.mask.as_ref(),
+        )
+        .map_err(|e| anyhow::anyhow!("could not award grin to wallet: {}", e))?;
+
+        for _ in 1..4 {
+            award_blocks_to_wallet(
+                self.wallet.chain.as_ref(),
+                self.wallet.inner.clone(),
+                self.wallet.mask.as_ref(),
+                3,
+                false,
+            )
+            .map_err(|e| anyhow::anyhow!("could not award grin to wallet: {}", e))?;
+        }
+
+        Ok(())
     }
+
+    pub fn kill(&self) {
+        let _ = std::fs::remove_dir_all(self.chain_dir.clone());
+    }
+}
+
+pub struct Wallets {
+    pub funder_wallet: Wallet,
+    pub redeemer_wallet: Wallet,
 }
 
 #[allow(clippy::type_complexity)]
@@ -153,18 +198,6 @@ impl Wallet {
             },
         )
         .map_err(|e| anyhow::anyhow!("could not post transaction: {}", e))
-    }
-
-    // 1 block reward (60 grin) is spendable after 4 blocks have been mined
-    pub fn award_60_grin(&self) -> anyhow::Result<()> {
-        award_blocks_to_wallet(
-            self.chain.as_ref(),
-            self.inner.clone(),
-            self.mask.as_ref(),
-            4,
-            false,
-        )
-        .map_err(|e| anyhow::anyhow!("could not award grin to wallet: {}", e))
     }
 
     pub fn issue_invoice(&self, amount: u64) -> anyhow::Result<Slate> {

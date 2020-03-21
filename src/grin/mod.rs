@@ -23,7 +23,7 @@ pub use crate::{
         offer::Offer,
         sign::FunderActions,
         special_outputs::*,
-        wallet::{Wallet, Wallets},
+        wallet::{Node, Wallet, Wallets},
     },
     schnorr::EncryptedSignature,
 };

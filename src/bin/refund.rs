@@ -1,6 +1,4 @@
-use grin_btc_poc::{
-    alice::Alice0, bitcoin, bob::Bob0, grin, keypair::random_secret_key, schnorr, Execute, LookFor,
-};
+use grin_btc_poc::{alice::Alice0, bitcoin, bob::Bob0, grin, keypair::random_secret_key, Execute};
 
 fn main() -> anyhow::Result<()> {
     // Set up Bitcoin wallets
@@ -17,11 +15,11 @@ fn main() -> anyhow::Result<()> {
         grin_node,
         grin::Wallets {
             funder_wallet: bob_beta_wallet,
-            redeemer_wallet: alice_beta_wallet,
+            ..
         },
     ) = grin::Node::start()?;
 
-    let alice_beta_starting_balance = alice_beta_wallet.get_balance()?;
+    let bob_beta_starting_balance = bob_beta_wallet.get_balance()?;
 
     // Base parameters of the swap, including the offer negotiated prior to
     // executing this protocol, and a set of outputs per party to know where the
@@ -66,7 +64,7 @@ fn main() -> anyhow::Result<()> {
     let (bob0, message1) = Bob0::<bitcoin::BobRedeemer0, grin::BobFunder0>::new(
         offer_bitcoin.clone(),
         outputs_bitcoin,
-        offer_grin.clone(),
+        offer_grin,
         outputs_grin,
         output_keypairs_grin_funder,
         message0,
@@ -85,41 +83,33 @@ fn main() -> anyhow::Result<()> {
     alice2
         .alpha_state
         .fund_action
+        .execute(&alice_alpha_wallet)?;
+
+    let fund_fee = bob2.beta_state.fund_action.execute(&bob_beta_wallet)?;
+
+    alice2
+        .alpha_state
+        .refund_action
         .clone()
         .execute(&alice_alpha_wallet)?;
 
-    bob2.beta_state.fund_action.execute(&bob_beta_wallet)?;
+    let refund_fee = bob2.beta_state.refund_action.execute(&bob_beta_wallet)?;
 
-    // Verify that alice funds the bitcoin
+    // Verify that alice gets her bitcoin back
     assert!(alice_alpha_wallet.verify_payment_to_address(
-        alice2.alpha_state.fund_action.transaction.txid(),
-        offer_bitcoin.fund_output_amount()
+        alice2.alpha_state.refund_action.transaction.txid(),
+        offer_bitcoin.asset
     )?);
 
-    alice2
-        .beta_state
-        .redeem_action
-        .execute(&alice_beta_wallet)?;
-
-    let beta_decrypted_redeem_sig = bob_beta_wallet.look_for(bob2.beta_state.redeem_event)?;
-    let y = schnorr::recover(&beta_decrypted_redeem_sig, &bob2.beta_state.recovery_key)?;
-    let alpha_redeem_action = bob2.alpha_state.encrypted_redeem_action.decrypt(&y);
-    let alpha_redeem_txid = alpha_redeem_action.transaction.txid();
-
-    alpha_redeem_action.execute(&bob_alpha_wallet)?;
-
-    // Verify that alice gets the agreed upon grin
+    // Verify that bob has the same amount of grin as before (minus fees)
     assert_eq!(
-        alice_beta_wallet.get_balance()?,
-        alice_beta_starting_balance + offer_grin.asset
+        bob_beta_wallet.get_balance()?,
+        bob_beta_starting_balance - fund_fee - refund_fee
     );
-
-    // Verify that bob gets the agreed upon bitcoin
-    assert!(bob_alpha_wallet.verify_payment_to_address(alpha_redeem_txid, offer_bitcoin.asset)?);
 
     // Clean-up
 
-    grin_node.kill();
     bitcoin_node.kill()?;
+    grin_node.kill();
     Ok(())
 }

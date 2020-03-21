@@ -87,6 +87,7 @@ pub fn funder(
             refund_transaction,
             *redeemer_refund_signature,
             funder_refund_signature,
+            fund_output_script.clone(),
         )
     };
 

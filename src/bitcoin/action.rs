@@ -10,24 +10,40 @@ use crate::{
     Execute,
 };
 use ::bitcoin::{hashes::Hash, util::bip143::SighashComponents, Script};
+use anyhow::Context;
 use secp256k1zkp::Message;
 
+#[derive(Clone)]
 pub struct Fund {
     pub transaction: Transaction,
 }
 
+#[derive(Clone)]
 pub struct Refund {
     pub transaction: Transaction,
-    pub redeemer_sig: Signature,
-    pub funder_sig: Signature,
 }
 
 impl Refund {
-    pub fn new(transaction: Transaction, redeemer_sig: Signature, funder_sig: Signature) -> Self {
-        Self {
-            transaction,
-            redeemer_sig,
-            funder_sig,
+    pub fn new(
+        transaction: Transaction,
+        redeemer_sig: Signature,
+        funder_sig: Signature,
+        fund_output_script: Script,
+    ) -> Self {
+        let mut completed_transaction = transaction;
+        let funder_witness = signature_into_witness(funder_sig);
+        let redeemer_witness = signature_into_witness(redeemer_sig);
+
+        completed_transaction.input[0].witness = vec![
+            vec![], /* You have to put some extra shit on the stack because OP_CHECKMULTISIG is
+                     * buggy */
+            redeemer_witness,
+            funder_witness,
+            fund_output_script.to_bytes(),
+        ];
+
+        Refund {
+            transaction: completed_transaction,
         }
     }
 }
@@ -105,16 +121,30 @@ pub struct Redeem {
 
 impl Execute for Fund {
     type Wallet = FunderWallet;
-    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<()> {
+    type Return = ();
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
         let transaction = wallet.sign_input(self.transaction)?;
 
-        wallet.send_rawtransaction(&transaction)
+        wallet.send_rawtransaction(&transaction).context("fund")
     }
 }
 
 impl Execute for Redeem {
     type Wallet = RedeemerWallet;
-    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<()> {
-        wallet.send_rawtransaction(&self.transaction)
+    type Return = ();
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
+        wallet
+            .send_rawtransaction(&self.transaction)
+            .context("redeem")
+    }
+}
+
+impl Execute for Refund {
+    type Wallet = FunderWallet;
+    type Return = ();
+    fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
+        wallet
+            .send_rawtransaction(&self.transaction)
+            .context("refund")
     }
 }

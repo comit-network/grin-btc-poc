@@ -84,6 +84,16 @@ impl FunderWallet {
 
         Ok(completed_tx)
     }
+
+    pub fn verify_payment_to_address(
+        &self,
+        txid: sha256d::Hash,
+        amount: u64,
+    ) -> anyhow::Result<bool> {
+        let transaction = self.get_rawtransaction(&txid)?;
+
+        Ok(transaction.output[0].value == amount)
+    }
 }
 
 pub struct RedeemerWallet {
@@ -103,7 +113,7 @@ impl RedeemerWallet {
         self.redeem_output_keypair.to_bitcoin_address()
     }
 
-    pub fn verify_payment_to_redeem_output_address(
+    pub fn verify_payment_to_address(
         &self,
         txid: sha256d::Hash,
         amount: u64,
