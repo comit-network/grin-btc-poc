@@ -125,10 +125,15 @@ pub fn random_secret_key() -> SecretKey {
     SecretKey::from_slice(&*SECP, &rand::thread_rng().gen::<[u8; 32]>()).unwrap()
 }
 
+// TODO: Give function a better name.  It looks like it just converts a public
+// key to a pedersen::Commitment. So public_key_to_pedersen_commitment would be
+// good.  Is there really no function for this in their library!?!
 pub fn build_commitment(pk: &PublicKey) -> pedersen::Commitment {
     let mut buffer = [0u8; 33];
 
     // Reverse first 32 bytes of pubkey
+    // TODO: Replace this "what" comment with a "why" comment.
+    // Why is it reversed?
     let mut commit = [0u8; 32];
     commit.copy_from_slice(&pk.0[0..32]);
     commit.reverse();

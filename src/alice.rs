@@ -123,6 +123,9 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
     }
 }
 
+//TODO: Move trait bounds from functions onto the impl Give the trait a
+// descriptive name.  Maybe HasCoinTossingKeys with a function
+// coin_tossing_keys()
 impl<A, B> Alice0<A, B> {
     pub fn state_and_message(
         alpha_state: A,

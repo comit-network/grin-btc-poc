@@ -10,14 +10,18 @@ pub struct Round1 {
 
 impl Round1 {
     /// To generate T_1 and T_2 for each party we hash their x_fund
+    // Why is this called a salt?
     pub fn new(private_nonce_salt: &SecretKey) -> anyhow::Result<Self> {
-        // They're not used in Round 1 ¯\_(ツ)_/¯
+        // --- BEGIN INIT UNUSED VALUES ---
         let value = 0;
         let blind = random_secret_key();
         let common_nonce = random_secret_key();
         let commit = SECP.commit_value(0)?;
+        // --- END INIT UNUSED VALUES ---
 
         let mut hasher = Sha256::new();
+        //TODO: Just pass in the private nonce. There's no point to hashing a secret
+        // key and making a new one that I can see.
         hasher.input(private_nonce_salt);
         let private_nonce = SecretKey::from_slice(&*SECP, &hasher.result())?;
 
@@ -33,6 +37,7 @@ impl Round1 {
             Some(&mut T_1),
             Some(&mut T_2),
             vec![commit], // What about an empty vector?
+            // TODO: What about this comment?^^^^^^^
             Some(&private_nonce),
             1,
         );
@@ -70,6 +75,7 @@ impl Round2 {
             SECP.commit_sum(vec![commit_blind, commit_value], Vec::new())?
         };
 
+        // TODO: remove hashing
         let mut hasher = Sha256::new();
         hasher.input(private_nonce_salt.clone());
         let private_nonce = SecretKey::from_slice(&*SECP, &hasher.result())?;
@@ -125,6 +131,7 @@ impl Round3 {
             SECP.commit_sum(vec![commit_blind, commit_value], Vec::new())?
         };
 
+        //TODO: Remove hashing
         let mut hasher = Sha256::new();
         hasher.input(private_nonce_salt.clone());
         let private_nonce = SecretKey::from_slice(&*SECP, &hasher.result())?;

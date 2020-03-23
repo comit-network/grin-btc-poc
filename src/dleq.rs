@@ -8,6 +8,9 @@ pub struct Proof {
 }
 
 pub fn prove(G: &PublicKey, Gx: &PublicKey, H: &PublicKey, Hx: &PublicKey, x: &SecretKey) -> Proof {
+    // NOTE: using thread_rng for Pic and even early stage production but there
+    // are more robust ways of doing this which include hashing secret
+    // information along with randomness (see https://github.com/bitcoin/bips/pull/893/).
     let r = KeyPair::new_random();
 
     // Gr
@@ -49,6 +52,7 @@ pub fn verify(
     // Gr = Gs + (Gx * -c) = Gr + Gcx - Gcx
     let Gr = {
         let mut Gxc_neg = *Gx;
+        //TODO: Don't panic on things controlled by adversary
         Gxc_neg.mul_assign(&*SECP, &c_neg).unwrap();
 
         let mut Gs = *G;
