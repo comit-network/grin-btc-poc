@@ -56,10 +56,11 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
         Bob1<grin::BobRedeemer1, bitcoin::BobFunder1>,
         Message3<(grin::RedeemerSigs, grin::bulletproof::Round2), bitcoin::EncryptedSignature>,
     )> {
-        let (alice_PKs_grin, alice_PKs_bitcoin, Y) = opening.open(self.alice_commitment)?;
+        let (alice_PKs_grin, alice_PKs_bitcoin, mut Y) = opening.open(self.alice_commitment)?;
 
-        let (grin_state, grin_redeemer_sigs, bulletproof_round_2_self) =
-            self.alpha_state.transition(alice_PKs_grin.try_into()?, Y)?;
+        let (grin_state, grin_redeemer_sigs, bulletproof_round_2_self) = self
+            .alpha_state
+            .transition(alice_PKs_grin.try_into()?, &mut Y)?;
         let (bitcoin_state, bitcoin_redeem_encsig) = self.beta_state.transition(
             alice_PKs_bitcoin.try_into()?,
             alice_bitcoin_refund_signature,

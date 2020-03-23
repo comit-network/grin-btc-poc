@@ -128,7 +128,7 @@ impl BobRedeemer0 {
     pub fn transition(
         mut self,
         mut PKs_other: PKs,
-        mut Y: PublicKey,
+        mut Y: &mut PublicKey,
     ) -> anyhow::Result<(BobRedeemer1, RedeemerSigs, bulletproof::Round2)> {
         normalize_redeem_keys_bob(
             &mut PKs_other.R_redeem,
@@ -140,7 +140,7 @@ impl BobRedeemer0 {
             self.bulletproof_round_1_self,
             self.bulletproof_round_1_other,
             PKs_other,
-            Y,
+            Y.clone(),
         )?;
 
         Ok((BobRedeemer1(state), redeemer_sigs, bulletproof_round_2_self))

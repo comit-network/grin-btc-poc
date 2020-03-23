@@ -33,7 +33,7 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
     }
 
     pub fn receive(
-        mut self,
+        self,
         message: Message1<grin::PKs, bitcoin::PKs>,
     ) -> anyhow::Result<(
         Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1>,
@@ -44,11 +44,9 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
         // ones
         let opening = self.opening();
 
-        let grin_state = self.alpha_state.transition(
-            message.PKs_alpha,
-            &mut self.y,
-            message.bulletproof_round_1_bob,
-        )?;
+        let grin_state = self
+            .alpha_state
+            .transition(message.PKs_alpha, message.bulletproof_round_1_bob)?;
         let (bitcoin_state, bitcoin_redeemer_refund_sig) =
             self.beta_state.transition(message.PKs_beta)?;
 

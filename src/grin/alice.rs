@@ -30,17 +30,10 @@ impl AliceFunder0 {
     }
 
     pub fn transition(
-        mut self,
-        mut PKs_other: PKs,
-        mut y: &mut KeyPair,
+        self,
+        PKs_other: PKs,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<AliceFunder1> {
-        normalize_redeem_keys_alice(
-            &mut self.common.SKs_self.r_redeem,
-            &mut PKs_other.R_redeem,
-            &mut y,
-        )?;
-
         Ok(AliceFunder1(Funder1 {
             offer: self.common.offer,
             special_outputs: self.common.special_outputs,
