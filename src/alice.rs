@@ -1,9 +1,9 @@
 use crate::{
     bitcoin,
-    commit::{Commitment, Opening},
+    commit::{CoinTossingKeys, Commitment, Opening},
     grin,
     messages::{Message0, Message1, Message2, Message3, Message4},
-    KeyPair, PublicKey,
+    KeyPair,
 };
 use grin::bulletproof;
 
@@ -39,9 +39,6 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
         Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1>,
         Message2<bitcoin::Signature>,
     )> {
-        // Building the opening must happen now, because some keys may change when
-        // transitioning Grin's state and Alice has already committed to the original
-        // ones
         let opening = self.opening();
 
         let grin_state = self
@@ -121,16 +118,16 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
     }
 }
 
-impl<A, B> Alice0<A, B> {
+impl<A, B> Alice0<A, B>
+where
+    A: Into<CoinTossingKeys> + Clone,
+    B: Into<CoinTossingKeys> + Clone,
+{
     pub fn state_and_message(
         alpha_state: A,
         beta_state: B,
         bulletproof_round_1_alice: grin::bulletproof::Round1,
-    ) -> (Self, Message0)
-    where
-        A: Into<Vec<PublicKey>> + Clone,
-        B: Into<Vec<PublicKey>> + Clone,
-    {
+    ) -> (Self, Message0) {
         let y = KeyPair::new_random();
 
         let commitment = Commitment::commit(
@@ -153,11 +150,7 @@ impl<A, B> Alice0<A, B> {
         (state, message)
     }
 
-    pub fn opening(&self) -> Opening
-    where
-        A: Into<Vec<PublicKey>> + Clone,
-        B: Into<Vec<PublicKey>> + Clone,
-    {
+    pub fn opening(&self) -> Opening {
         Opening::new(
             self.alpha_state.clone().into(),
             self.beta_state.clone().into(),

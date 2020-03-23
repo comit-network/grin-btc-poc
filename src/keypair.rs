@@ -1,7 +1,8 @@
+use crate::bitcoin::{Address, BitcoinPublicKey, Network};
 use rand::Rng;
+use secp256k1zkp::{ContextFlag, Message, Secp256k1, Signature};
+
 pub use secp256k1zkp::key::{PublicKey, SecretKey, ZERO_KEY};
-use secp256k1zkp::{pedersen, ContextFlag, Message, Secp256k1, Signature};
-use crate::bitcoin::{BitcoinPublicKey,Address, Network};
 
 lazy_static::lazy_static! {
     pub static ref SECP: Secp256k1 = Secp256k1::with_caps(ContextFlag::Commit);
@@ -55,7 +56,13 @@ impl KeyPair {
     }
 
     pub fn to_bitcoin_address(&self) -> Address {
-        Address::p2wpkh(&BitcoinPublicKey { key: self.public_key, compressed: true }, Network::Regtest)
+        Address::p2wpkh(
+            &BitcoinPublicKey {
+                key: self.public_key,
+                compressed: true,
+            },
+            Network::Regtest,
+        )
     }
 }
 
@@ -123,50 +130,4 @@ impl Negate for KeyPair {
 
 pub fn random_secret_key() -> SecretKey {
     SecretKey::from_slice(&*SECP, &rand::thread_rng().gen::<[u8; 32]>()).unwrap()
-}
-
-pub fn build_commitment(pk: &PublicKey) -> pedersen::Commitment {
-    let mut buffer = [0u8; 33];
-
-    // Reverse first 32 bytes of pubkey
-    let mut commit = [0u8; 32];
-    commit.copy_from_slice(&pk.0[0..32]);
-    commit.reverse();
-    buffer[1..33].copy_from_slice(&commit);
-
-    let mut pk_y = purerust_secp256k1::curve::Field::default();
-    assert!(pk_y.set_b32(&pk.y_coor()));
-
-    if !pk_y.is_quad_var() {
-        buffer[0] = 0x09;
-    } else {
-        buffer[0] = 0x08;
-    }
-
-    pedersen::Commitment::from_vec(buffer.to_vec())
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn to_commitment_roundtrip() {
-        let x = KeyPair::new_random();
-        let commit = build_commitment(&x.public_key);
-
-        let theirs = commit.to_pubkey(&*SECP).unwrap();
-        let ours = x.public_key;
-
-        assert_eq!(theirs, ours);
-    }
-
-    #[test]
-    fn to_commitment_vs_commit() {
-        let x = KeyPair::new_random();
-        let ours = build_commitment(&x.public_key);
-        let theirs = SECP.commit(0, x.secret_key).unwrap();
-
-        assert_eq!(theirs, ours);
-    }
 }

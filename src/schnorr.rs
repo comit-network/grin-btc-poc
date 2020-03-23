@@ -207,6 +207,7 @@ pub enum Error {
     VerifySig,
 }
 
+// This is only used during tests when you have all the secret keys
 pub fn normalize_keypairs(
     r0: KeyPair,
     r1: KeyPair,

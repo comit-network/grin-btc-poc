@@ -1,10 +1,10 @@
 use crate::{
+    commit::CoinTossingKeys,
     grin::{
         action, bulletproof, normalize_redeem_keys_alice, EncryptedSignature, Funder0, Funder1,
         Funder2, KeyPair, Offer, PKs, Redeemer0, Redeemer1, Redeemer2, RedeemerSigs,
         SpecialOutputKeyPairsFunder, SpecialOutputKeyPairsRedeemer, SpecialOutputs,
     },
-    PublicKey,
 };
 use std::convert::TryInto;
 
@@ -155,21 +155,21 @@ pub struct AliceRedeemer2 {
     pub redeem_action: action::Redeem,
 }
 
-impl Into<Vec<PublicKey>> for AliceFunder0 {
-    fn into(self) -> Vec<PublicKey> {
+impl Into<CoinTossingKeys> for AliceFunder0 {
+    fn into(self) -> CoinTossingKeys {
         let PKs: PKs = self.common.SKs_self.into();
         vec![PKs.X, PKs.R_fund, PKs.R_redeem, PKs.R_refund]
     }
 }
 
-impl Into<Vec<PublicKey>> for AliceRedeemer0 {
-    fn into(self) -> Vec<PublicKey> {
+impl Into<CoinTossingKeys> for AliceRedeemer0 {
+    fn into(self) -> CoinTossingKeys {
         let PKs: PKs = self.common.SKs_self.into();
         vec![PKs.X, PKs.R_fund, PKs.R_redeem, PKs.R_refund]
     }
 }
 
-impl TryInto<PKs> for Vec<PublicKey> {
+impl TryInto<PKs> for CoinTossingKeys {
     type Error = anyhow::Error;
     fn try_into(self) -> anyhow::Result<PKs> {
         Ok(PKs {

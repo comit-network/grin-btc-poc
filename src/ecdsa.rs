@@ -72,10 +72,13 @@ pub fn encverify(
         proof,
     }: &EncryptedSignature,
 ) -> Result<(), EncVerifyError> {
+    //TODO: check that s_hat is not 0 -- it will cause a panic
     if !dleq::verify(&*G, R_hat, Y, R, proof) {
         return Err(EncVerifyError::InvalidProof);
     }
 
+    //TODO: Don't panic on something that can be provided by a malicious party
+    // ::from_slice(0) panics
     let R_x = SecretKey::from_slice(&*SECP, &R.x_coor()).unwrap();
 
     let message_hash = SecretKey::from_slice(&*SECP, message_hash).unwrap();

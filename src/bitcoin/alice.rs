@@ -3,7 +3,8 @@ use crate::{
         action, sign::FunderActions, wallet_outputs::WalletOutputs, EncryptedSignature, Funder0,
         Funder1, Offer, PKs, Redeemer0, Redeemer1, Signature,
     },
-    KeyPair, PublicKey,
+    commit::CoinTossingKeys,
+    KeyPair,
 };
 use std::convert::TryInto;
 
@@ -87,21 +88,21 @@ pub struct AliceRedeemer2 {
     pub redeem_action: action::Redeem,
 }
 
-impl Into<Vec<PublicKey>> for AliceFunder0 {
-    fn into(self) -> Vec<PublicKey> {
+impl Into<CoinTossingKeys> for AliceFunder0 {
+    fn into(self) -> CoinTossingKeys {
         let PKs: PKs = self.0.SKs_self.into();
         vec![PKs.X]
     }
 }
 
-impl Into<Vec<PublicKey>> for AliceRedeemer0 {
-    fn into(self) -> Vec<PublicKey> {
+impl Into<CoinTossingKeys> for AliceRedeemer0 {
+    fn into(self) -> CoinTossingKeys {
         let PKs: PKs = self.0.SKs_self.into();
         vec![PKs.X]
     }
 }
 
-impl TryInto<PKs> for Vec<PublicKey> {
+impl TryInto<PKs> for CoinTossingKeys {
     type Error = anyhow::Error;
     fn try_into(self) -> anyhow::Result<PKs> {
         Ok(PKs { X: self[0] })

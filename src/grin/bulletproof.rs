@@ -1,4 +1,7 @@
-use crate::keypair::{build_commitment, random_secret_key, PublicKey, SecretKey, SECP};
+use crate::{
+    grin::public_key_to_pedersen_commitment,
+    keypair::{random_secret_key, PublicKey, SecretKey, SECP},
+};
 use secp256k1zkp::pedersen::RangeProof;
 use sha2::{Digest, Sha256};
 
@@ -22,16 +25,13 @@ pub struct Round1 {
 
 impl Round1 {
     /// To generate T_1 and T_2 for each party we hash their x_fund
-    pub fn new(private_nonce_salt: &SecretKey) -> anyhow::Result<Self> {
-        // They're not used in Round 1 ¯\_(ツ)_/¯
+    pub fn new(private_nonce: &SecretKey) -> anyhow::Result<Self> {
+        // --- BEGIN INIT UNUSED VALUES ---
         let value = 0;
         let blind = random_secret_key();
         let common_nonce = random_secret_key();
         let commit = SECP.commit_value(0)?;
-
-        let mut hasher = Sha256::new();
-        hasher.input(private_nonce_salt);
-        let private_nonce = SecretKey::from_slice(&*SECP, &hasher.result())?;
+        // --- END INIT UNUSED VALUES ---
 
         let mut T_1 = PublicKey::new();
         let mut T_2 = PublicKey::new();
@@ -44,7 +44,7 @@ impl Round1 {
             None,
             Some(&mut T_1),
             Some(&mut T_2),
-            vec![commit], // What about an empty vector?
+            vec![commit],
             Some(&private_nonce),
             1,
         );
@@ -59,7 +59,7 @@ pub struct Round2 {
 
 impl Round2 {
     pub fn new(
-        private_nonce_salt: &SecretKey,
+        private_nonce: &SecretKey,
         x_j: &SecretKey,
         X: &PublicKey,
         value: u64,
@@ -77,14 +77,10 @@ impl Round2 {
         let mut T_two = PublicKey::from_combination(&*SECP, vec![&T_2_R, &T_2_F])?;
 
         let commit = {
-            let commit_blind = build_commitment(&X);
+            let commit_blind = public_key_to_pedersen_commitment(&X);
             let commit_value = SECP.commit_value(value)?;
             SECP.commit_sum(vec![commit_blind, commit_value], Vec::new())?
         };
-
-        let mut hasher = Sha256::new();
-        hasher.input(private_nonce_salt.clone());
-        let private_nonce = SecretKey::from_slice(&*SECP, &hasher.result())?;
 
         let mut tau_x = SecretKey([0; 32]);
         SECP.bullet_proof_multisig(
@@ -112,7 +108,7 @@ pub struct Round3 {
 impl Round3 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        private_nonce_salt: &SecretKey,
+        private_nonce: &SecretKey,
         x_j: &SecretKey,
         X: &PublicKey,
         value: u64,
@@ -132,14 +128,10 @@ impl Round3 {
         let mut T_two = PublicKey::from_combination(&*SECP, vec![&T_2_R, &T_2_F])?;
 
         let commit = {
-            let commit_blind = build_commitment(&X);
+            let commit_blind = public_key_to_pedersen_commitment(&X);
             let commit_value = SECP.commit_value(value)?;
             SECP.commit_sum(vec![commit_blind, commit_value], Vec::new())?
         };
-
-        let mut hasher = Sha256::new();
-        hasher.input(private_nonce_salt.clone());
-        let private_nonce = SecretKey::from_slice(&*SECP, &hasher.result())?;
 
         let mut tau_x = {
             let mut tau_x = tau_x_R.clone();

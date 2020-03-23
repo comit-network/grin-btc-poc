@@ -9,10 +9,12 @@ pub struct Opening {
     Y: PublicKey,
 }
 
+pub type CoinTossingKeys = Vec<PublicKey>;
+
 impl Commitment {
     pub fn commit(
-        PKs_alpha: Vec<PublicKey>,
-        PKs_beta: Vec<PublicKey>,
+        PKs_alpha: CoinTossingKeys,
+        PKs_beta: CoinTossingKeys,
         Y: &PublicKey,
     ) -> Commitment {
         let mut hasher = Blake2b::new();
@@ -35,7 +37,7 @@ impl Commitment {
 }
 
 impl Opening {
-    pub fn new(PKs_alpha: Vec<PublicKey>, PKs_beta: Vec<PublicKey>, Y: PublicKey) -> Self {
+    pub fn new(PKs_alpha: CoinTossingKeys, PKs_beta: CoinTossingKeys, Y: PublicKey) -> Self {
         Opening {
             PKs_alpha,
             PKs_beta,
@@ -46,7 +48,7 @@ impl Opening {
     pub fn open(
         self,
         commitment: Commitment,
-    ) -> anyhow::Result<(Vec<PublicKey>, Vec<PublicKey>, PublicKey)> {
+    ) -> anyhow::Result<(CoinTossingKeys, CoinTossingKeys, PublicKey)> {
         let self_commitment =
             Commitment::commit(self.PKs_alpha.clone(), self.PKs_beta.clone(), &self.Y);
 

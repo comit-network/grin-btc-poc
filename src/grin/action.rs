@@ -1,10 +1,10 @@
 use crate::{
     grin::{
-        compute_excess_pk, compute_excess_sk, compute_offset,
+        compute_excess_pk, compute_excess_sk, compute_offset, public_key_to_pedersen_commitment,
         wallet::{build_input, build_output},
         Offer, PKs, SKs, SpecialOutputKeyPairsRedeemer, SpecialOutputs, Wallet,
     },
-    keypair::{build_commitment, random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
+    keypair::{random_secret_key, KeyPair, PublicKey, SecretKey, SECP},
     schnorr, Execute,
 };
 use anyhow::Context;
@@ -233,7 +233,7 @@ fn new_transaction(
 
             Ok(Input::new(
                 OutputFeatures::Plain,
-                build_commitment(&commit_pk),
+                public_key_to_pedersen_commitment(&commit_pk),
             ))
         })
         .collect::<Result<Vec<Input>, anyhow::Error>>()?;
@@ -242,9 +242,10 @@ fn new_transaction(
         .iter()
         .map(|(amount, blind_pk, proof)| {
             let amount_pk = SECP.commit_value(amount.clone())?.to_pubkey(&*SECP)?;
-            let commit = build_commitment(&PublicKey::from_combination(&*SECP, vec![
-                &amount_pk, &blind_pk,
-            ])?);
+            let commit =
+                public_key_to_pedersen_commitment(&PublicKey::from_combination(&*SECP, vec![
+                    &amount_pk, &blind_pk,
+                ])?);
 
             Ok(Output {
                 features: OutputFeatures::Plain,
@@ -254,7 +255,7 @@ fn new_transaction(
         })
         .collect::<Result<Vec<Output>, anyhow::Error>>()?;
 
-    let excess = build_commitment(&excess_pk);
+    let excess = public_key_to_pedersen_commitment(&excess_pk);
 
     let kernel = {
         TxKernel {
@@ -331,7 +332,7 @@ impl Execute for Fund {
 
             let mut tx = slate.tx;
 
-            tx.body.kernels[0].excess = build_commitment(&excess);
+            tx.body.kernels[0].excess = public_key_to_pedersen_commitment(&excess);
             tx.body.kernels[0].excess_sig = sig;
 
             tx.body.kernels[0].verify().map_err(|e| {

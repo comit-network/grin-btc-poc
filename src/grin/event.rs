@@ -1,6 +1,5 @@
-use crate::{
-    grin::{compute_excess_pk, compute_offset, PKs, SpecialOutputs},
-    keypair::build_commitment,
+use crate::grin::{
+    compute_excess_pk, compute_offset, public_key_to_pedersen_commitment, PKs, SpecialOutputs,
 };
 use secp256k1zkp::pedersen::Commitment;
 
@@ -23,7 +22,7 @@ impl Redeem {
         )?;
 
         Ok(Self {
-            excess: build_commitment(&excess_pk),
+            excess: public_key_to_pedersen_commitment(&excess_pk),
         })
     }
 }

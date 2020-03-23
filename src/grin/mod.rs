@@ -1,5 +1,5 @@
 use crate::keypair::{KeyPair, Negate, PublicKey, SecretKey, XCoor, YCoor, G, SECP};
-use secp256k1zkp::key::ZERO_KEY;
+use secp256k1zkp::{key::ZERO_KEY, pedersen};
 use sha2::{Digest, Sha256};
 
 pub mod action;
@@ -200,6 +200,10 @@ pub fn compute_excess_sk(
     outputs: Vec<&SecretKey>,
     offset: Option<&SecretKey>,
 ) -> anyhow::Result<SecretKey> {
+    // TODO: Since this lets you use ZERO_KEY I don't see why you need the match
+    // statements you should be able to do it all sequentially? Or is it that
+    // add_assign will work if self is ZERO_KEY but not the argument? (that
+    // would be dumb).
     let mut total = match (inputs.clone(), outputs.clone()) {
         (inputs, outputs) if inputs.is_empty() && outputs.is_empty() => {
             return Err(anyhow::anyhow!("invalid arguments"))
@@ -244,6 +248,7 @@ pub fn compute_excess_sk(
     }
 }
 
+// NOTE: the error case here is were the rust is when the result is the identity
 pub fn compute_excess_pk(
     inputs: Vec<&PublicKey>,
     outputs: Vec<&PublicKey>,
@@ -284,6 +289,9 @@ pub fn compute_excess_pk(
 pub fn compute_offset(funder_R: &PublicKey, redeemer_R: &PublicKey) -> anyhow::Result<SecretKey> {
     let mut hasher = Sha256::default();
 
+    // NOTE: the offset is any random value known only to the two parties so we
+    // just hash two nonces together. Other parties should never discover this
+    // representation of R.
     hasher.input(&funder_R.x_coor());
     hasher.input(&redeemer_R.x_coor());
 
@@ -299,6 +307,9 @@ pub fn normalize_redeem_keys_alice(
     let mut R_y = purerust_secp256k1::curve::Field::default();
     assert!(R_y.set_b32(&R.y_coor()));
 
+    // For grin, the R's y value must be a quadratic residue. If it's not we
+    // negate all the keys that combine to produce R to flip it to the y
+    // coordinate that is.
     if !R_y.is_quad_var() {
         *r0 = r0.negate();
         *R1 = R1.negate();
@@ -327,5 +338,58 @@ pub fn normalize_redeem_keys_bob(
         Ok(())
     } else {
         Ok(())
+    }
+}
+
+/// The library secp256k1-zkp does not offer an API to transform a public key
+/// into a Pedersen commitment, which is why we have to define it ourselves
+pub fn public_key_to_pedersen_commitment(pk: &PublicKey) -> pedersen::Commitment {
+    // In secp256k1-zkp, Pedersen commitments are represented as arrays of 33
+    // bytes
+    let mut buffer = [0u8; 33];
+
+    // The first byte is 0x08 if the y-coordinate of the corresponding public key is
+    // a quadratic residue, and 0x09 if it is not
+    let mut pk_y = purerust_secp256k1::curve::Field::default();
+    assert!(pk_y.set_b32(&pk.y_coor()));
+
+    if pk_y.is_quad_var() {
+        buffer[0] = 0x08;
+    } else {
+        buffer[0] = 0x09;
+    }
+
+    // The last 32 bytes are filled in by the x-coordinate of the corresponding
+    // public key, but in reverse order
+    let mut commit = [0u8; 32];
+    commit.copy_from_slice(&pk.0[0..32]);
+    commit.reverse();
+    buffer[1..33].copy_from_slice(&commit);
+
+    pedersen::Commitment::from_vec(buffer.to_vec())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn to_commitment_roundtrip() {
+        let x = KeyPair::new_random();
+        let commit = public_key_to_pedersen_commitment(&x.public_key);
+
+        let theirs = commit.to_pubkey(&*SECP).unwrap();
+        let ours = x.public_key;
+
+        assert_eq!(theirs, ours);
+    }
+
+    #[test]
+    fn to_commitment_vs_commit() {
+        let x = KeyPair::new_random();
+        let ours = public_key_to_pedersen_commitment(&x.public_key);
+        let theirs = SECP.commit(0, x.secret_key).unwrap();
+
+        assert_eq!(theirs, ours);
     }
 }

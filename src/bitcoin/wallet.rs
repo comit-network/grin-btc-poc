@@ -145,6 +145,8 @@ impl LookFor for FunderWallet {
 
         // the redeem transaction contains 1 input
         transaction.input[0]
+            // OP_CHECKMULTISIG doesn't enforce order so we go through all
+            // of them.
             .witness
             .iter()
             .find_map(|witness| {
