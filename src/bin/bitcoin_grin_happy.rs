@@ -1,6 +1,4 @@
-use grin_btc_poc::{
-    alice::Alice0, bitcoin, bob::Bob0, grin, keypair::random_secret_key, schnorr, Execute, LookFor,
-};
+use grin_btc_poc::{alice::Alice0, bitcoin, bob::Bob0, grin, schnorr, Execute, LookFor};
 
 fn main() -> anyhow::Result<()> {
     // Set up Bitcoin wallets
@@ -50,7 +48,6 @@ fn main() -> anyhow::Result<()> {
         fund_input_key: output_keypairs_grin_funder.fund_input_key.public_key,
         redeem_output_key: output_keypairs_grin_redeemer.redeem_output_key.public_key,
         refund_output_key: output_keypairs_grin_funder.refund_output_key.public_key,
-        bulletproof_common_nonce: random_secret_key(),
     };
 
     // Key generation and signing

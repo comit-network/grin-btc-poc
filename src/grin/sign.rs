@@ -22,6 +22,7 @@ pub fn redeemer(
     redeemer_SKs: &SKs,
     funder_PKs: &PKs,
     Y: &PublicKey,
+    bulletproof_common_nonce: &bulletproof::CommonNonce,
     bulletproof_round_1_redeemer: &bulletproof::Round1,
     bulletproof_round_1_funder: &bulletproof::Round1,
 ) -> anyhow::Result<(RedeemerSigs, bulletproof::Round2)> {
@@ -61,7 +62,7 @@ pub fn redeemer(
                 &redeemer_SKs.x.secret_key,
                 &excess_pk,
                 offer.fund_output_amount(),
-                &special_outputs.bulletproof_common_nonce,
+                &bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
                 &bulletproof_round_1_funder,
             )?
@@ -161,6 +162,7 @@ pub fn funder(
         s_refund: s_refund_redeemer,
         s_hat_redeem: s_hat_redeem_redeemer,
     }: RedeemerSigs,
+    bulletproof_common_nonce: &bulletproof::CommonNonce,
     bulletproof_round_1_redeemer: &bulletproof::Round1,
     bulletproof_round_1_funder: &bulletproof::Round1,
     bulletproof_round_2_redeemer: &bulletproof::Round2,
@@ -197,7 +199,7 @@ pub fn funder(
                 &funder_SKs.x.secret_key,
                 &X,
                 offer.fund_output_amount(),
-                &special_outputs.bulletproof_common_nonce,
+                &bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
                 &bulletproof_round_1_funder,
             )?;
@@ -206,7 +208,7 @@ pub fn funder(
                 &funder_SKs.x.secret_key,
                 &X,
                 offer.fund_output_amount(),
-                &special_outputs.bulletproof_common_nonce,
+                &bulletproof_common_nonce,
                 &bulletproof_round_1_redeemer,
                 &bulletproof_round_1_funder,
                 &bulletproof_round_2_redeemer,

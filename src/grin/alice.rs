@@ -11,6 +11,7 @@ use std::convert::TryInto;
 #[derive(Clone)]
 pub struct AliceFunder0 {
     pub common: Funder0,
+    pub bulletproof_common_nonce: bulletproof::CommonNonce,
     pub bulletproof_round_1_self: bulletproof::Round1,
 }
 
@@ -21,10 +22,14 @@ impl AliceFunder0 {
         special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
     ) -> anyhow::Result<Self> {
         let common = Funder0::new(offer, special_outputs, special_output_keypairs_funder);
+
+        let bulletproof_common_nonce =
+            bulletproof::CommonNonce::derive(&common.SKs_self.x.public_key)?;
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
             common,
+            bulletproof_common_nonce,
             bulletproof_round_1_self,
         })
     }
@@ -40,6 +45,7 @@ impl AliceFunder0 {
             special_output_keypairs_funder: self.common.special_output_keypairs_funder,
             SKs_self: self.common.SKs_self,
             PKs_other,
+            bulletproof_common_nonce: self.bulletproof_common_nonce,
             bulletproof_round_1_self: self.bulletproof_round_1_self,
             bulletproof_round_1_other,
         }))
@@ -68,6 +74,7 @@ pub struct AliceFunder2(pub Funder2);
 #[derive(Clone)]
 pub struct AliceRedeemer0 {
     pub common: Redeemer0,
+    pub bulletproof_common_nonce: bulletproof::CommonNonce,
     pub bulletproof_round_1_self: bulletproof::Round1,
 }
 
@@ -78,10 +85,14 @@ impl AliceRedeemer0 {
         special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
     ) -> anyhow::Result<Self> {
         let common = Redeemer0::new(offer, special_outputs, special_output_keypairs_redeemer);
+
+        let bulletproof_common_nonce =
+            bulletproof::CommonNonce::derive(&common.SKs_self.x.public_key)?;
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
             common,
+            bulletproof_common_nonce,
             bulletproof_round_1_self,
         })
     }
@@ -99,6 +110,7 @@ impl AliceRedeemer0 {
         )?;
 
         let (state, redeemer_sigs, bulletproof_round_2_self) = self.common.transition(
+            self.bulletproof_common_nonce,
             self.bulletproof_round_1_self.clone(),
             bulletproof_round_1_other.clone(),
             PKs_other,

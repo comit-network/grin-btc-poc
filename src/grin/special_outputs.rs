@@ -1,4 +1,4 @@
-use crate::{KeyPair, PublicKey, SecretKey};
+use crate::{KeyPair, PublicKey};
 
 /// Special outputs allow the signing phase to occur without knowledge of the
 /// actual wallet outputs of either party. They can be generated locally and
@@ -10,8 +10,6 @@ pub struct SpecialOutputs {
     pub fund_input_key: PublicKey,
     pub redeem_output_key: PublicKey,
     pub refund_output_key: PublicKey,
-    // TODO: this doesn't belong here
-    pub bulletproof_common_nonce: SecretKey,
 }
 
 #[derive(Debug, Clone)]

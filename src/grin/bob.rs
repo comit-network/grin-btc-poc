@@ -45,6 +45,7 @@ impl BobFunder0 {
             special_output_keypairs_funder: self.common.special_output_keypairs_funder,
             SKs_self: self.common.SKs_self.clone(),
             PKs_other: PKs_other.clone(),
+            bulletproof_common_nonce: bulletproof::CommonNonce::derive(&PKs_other.X)?,
             bulletproof_round_1_self: self.bulletproof_round_1_self,
             bulletproof_round_1_other: self.bulletproof_round_1_other,
         };
@@ -136,7 +137,9 @@ impl BobRedeemer0 {
             &mut Y,
         )?;
 
+        let bulletproof_common_nonce = bulletproof::CommonNonce::derive(&PKs_other.X)?;
         let (state, redeemer_sigs, bulletproof_round_2_self) = self.common.transition(
+            bulletproof_common_nonce,
             self.bulletproof_round_1_self,
             self.bulletproof_round_1_other,
             PKs_other,

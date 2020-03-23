@@ -65,6 +65,7 @@ pub struct Funder1 {
     pub special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
     pub SKs_self: SKs,
     pub PKs_other: PKs,
+    pub bulletproof_common_nonce: bulletproof::CommonNonce,
     pub bulletproof_round_1_self: bulletproof::Round1,
     pub bulletproof_round_1_other: bulletproof::Round1,
 }
@@ -84,6 +85,7 @@ impl Funder1 {
             &self.PKs_other,
             &Y,
             redeemer_sigs,
+            &self.bulletproof_common_nonce,
             &self.bulletproof_round_1_other,
             &self.bulletproof_round_1_self,
             &bulletproof_round_2_other,
@@ -129,6 +131,7 @@ impl Redeemer0 {
 
     pub fn transition(
         self,
+        bulletproof_common_nonce: bulletproof::CommonNonce,
         bulletproof_round_1_self: bulletproof::Round1,
         bulletproof_round_1_other: bulletproof::Round1,
         PKs_other: PKs,
@@ -141,6 +144,7 @@ impl Redeemer0 {
             &self.SKs_self,
             &PKs_other,
             &Y,
+            &bulletproof_common_nonce,
             &bulletproof_round_1_self,
             &bulletproof_round_1_other,
         )?;

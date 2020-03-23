@@ -2,6 +2,18 @@ use crate::keypair::{build_commitment, random_secret_key, PublicKey, SecretKey, 
 use secp256k1zkp::pedersen::RangeProof;
 use sha2::{Digest, Sha256};
 
+#[derive(Clone, Debug)]
+pub struct CommonNonce(SecretKey);
+
+impl CommonNonce {
+    pub fn derive(pk: &PublicKey) -> anyhow::Result<Self> {
+        let mut hasher = Sha256::new();
+        hasher.input(pk.0);
+        let sk = SecretKey::from_slice(&*SECP, &hasher.result())?;
+        Ok(Self(sk))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Round1 {
     pub T_1: PublicKey,
@@ -51,7 +63,7 @@ impl Round2 {
         x_j: &SecretKey,
         X: &PublicKey,
         value: u64,
-        common_nonce: &SecretKey,
+        common_nonce: &CommonNonce,
         Round1 {
             T_1: T_1_R,
             T_2: T_2_R,
@@ -78,7 +90,7 @@ impl Round2 {
         SECP.bullet_proof_multisig(
             value,
             x_j.clone(),
-            common_nonce.clone(),
+            common_nonce.0.clone(),
             None,
             None,
             Some(&mut tau_x),
@@ -104,7 +116,7 @@ impl Round3 {
         x_j: &SecretKey,
         X: &PublicKey,
         value: u64,
-        common_nonce: &SecretKey,
+        common_nonce: &CommonNonce,
         Round1 {
             T_1: T_1_R,
             T_2: T_2_R,
@@ -139,7 +151,7 @@ impl Round3 {
             .bullet_proof_multisig(
                 value,
                 x_j.clone(),
-                common_nonce.clone(),
+                common_nonce.0.clone(),
                 None,
                 None,
                 Some(&mut tau_x),
@@ -163,14 +175,14 @@ mod test {
     use crate::keypair::{KeyPair, Negate};
 
     #[test]
-    fn testing_things() -> anyhow::Result<()> {
+    fn can_generate_multiparty_bulletproof() -> anyhow::Result<()> {
         let value = 1_000_000;
-
-        let common_nonce = random_secret_key();
 
         let x_input = KeyPair::new_random();
 
         let x_alice = KeyPair::new_random();
+        let common_nonce = CommonNonce::derive(&x_alice.public_key)?;
+
         let x_bob = KeyPair::new_random();
 
         let X = PublicKey::from_combination(&*SECP, vec![
