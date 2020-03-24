@@ -11,6 +11,10 @@ use bitcoin::{
 use bitcoin_hashes::sha256d;
 use secp256k1zkp::Message;
 
+/// Simple Bitcoin wallet specifically built for the purpose of funding (and
+/// refunding, if necessary) Bitcoin. It owns all the outputs which a real-world
+/// wallet would have to own in order to be the funder of Bitcoin in the
+/// protocol
 pub struct FunderWallet {
     url: String,
     fund_input: Output,
@@ -40,10 +44,13 @@ impl FunderWallet {
         self.fund_input.clone()
     }
 
-    pub fn sign_input(&self, transaction: Transaction) -> anyhow::Result<Transaction> {
+    /// Add signature for the input of the fund transaction. If the input is not
+    /// owned by this wallet it returns an error.
+    pub fn sign_fund_input(&self, transaction: Transaction) -> anyhow::Result<Transaction> {
         let mut completed_tx = transaction;
         let sighash_components = SighashComponents::new(&completed_tx);
 
+        // TODO: There's only ever one input. This should probably not be a loop
         #[allow(clippy::toplevel_ref_arg)]
         for ref mut input in &mut completed_tx.input {
             let wallet_input = self.fund_input();
@@ -96,6 +103,9 @@ impl FunderWallet {
     }
 }
 
+/// Simple Bitcoin wallet specifically built for the purpose of redeeming
+/// Bitcoin. It owns all the outputs which a real-world wallet would have to own
+/// in order to be the redeemer of Bitcoin in the protocol
 pub struct RedeemerWallet {
     url: String,
     redeem_output_keypair: KeyPair,

@@ -1,6 +1,7 @@
 #[derive(Debug, Clone)]
 pub struct Offer {
     pub asset: u64,
+    // TODO: Given the use of special outputs, I believe the offer does not need to include the fee
     pub fee: u64, // for simplicity we don't model separate fee values for different transactions
     pub expiry: u64, // block height
 }

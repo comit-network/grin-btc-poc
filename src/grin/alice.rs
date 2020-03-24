@@ -79,15 +79,29 @@ pub struct AliceRedeemer0 {
 }
 
 impl AliceRedeemer0 {
+    /// Run key generation for the redeemer of grin. Specifically for Alice, the
+    /// bulletproof common nonce is derived from her X_fund, and the first round
+    /// of the multi-party bulletproof protocol is executed.
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
         special_output_keypairs_redeemer: SpecialOutputKeyPairsRedeemer,
     ) -> anyhow::Result<Self> {
+        // Run key generation for the redeemer of grin
         let common = Redeemer0::new(offer, special_outputs, special_output_keypairs_redeemer);
 
+        // TODO: What follows is duplicated for this and AliceFunder0::new. Could be
+        // extracted into grin::Alice0
+
+        // Derive bulletproof common nonce from Alice's X_fund. This signifies a
+        // dependency between key generation and multi-party bulletproof generation.
+        // Other than generating the bulletproof in a different way it may be
+        // cleaner to just separate the bulletproof generation protocol, to
+        // perform it right after key generation. The trade-off would be an increase in
+        // the number of messages.
         let bulletproof_common_nonce =
             bulletproof::CommonNonce::derive(&common.SKs_self.x.public_key)?;
+        // Run round 1 of the bulletproof protocol for Alice
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
@@ -97,18 +111,24 @@ impl AliceRedeemer0 {
         })
     }
 
+    /// Run signing algorithm for redeemer of grin. Also continue with second
+    /// round of multi-party bulletproof protocol.
     pub fn transition(
         mut self,
         mut PKs_other: PKs,
         mut y: &mut KeyPair,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<(AliceRedeemer1, RedeemerSigs, bulletproof::Round2)> {
+        // Without this check and possible mutation the decrypted Grin redeem signature
+        // fails to verify 50% of the time
         normalize_redeem_keys_alice(
             &mut self.common.SKs_self.r_redeem,
             &mut PKs_other.R_redeem,
             &mut y,
         )?;
 
+        // Run Grin redeemer's signing algorithm (also continue with 2nd
+        // round of multi-party bulletproof protocol)
         let (state, redeemer_sigs, bulletproof_round_2_self) = self.common.transition(
             self.bulletproof_common_nonce,
             self.bulletproof_round_1_self.clone(),

@@ -23,6 +23,9 @@ pub struct Node {
 }
 
 impl Node {
+    /// Start test Grin node and initialise wallets: one for the funder, one
+    /// for the redeemer and another one for the node to be able to mine blocks.
+    /// Also, mint a block reward for the funder.
     pub fn start() -> anyhow::Result<(Self, Wallets)> {
         let chain_dir = "target/test_output/";
 
@@ -104,7 +107,7 @@ impl Node {
         }))
     }
 
-    // 1 block reward (60 grin) is spendable after 4 blocks have been mined
+    /// Award 1 block reward (60 grin) to a Grin wallet
     fn award_60_grin(&self, wallet: &Wallet) -> anyhow::Result<()> {
         award_block_to_wallet(
             wallet.chain.as_ref(),
@@ -114,16 +117,17 @@ impl Node {
         )
         .map_err(|e| anyhow::anyhow!("could not award grin to wallet: {}", e))?;
 
-        for _ in 1..4 {
-            award_blocks_to_wallet(
-                self.wallet.chain.as_ref(),
-                self.wallet.inner.clone(),
-                self.wallet.mask.as_ref(),
-                3,
-                false,
-            )
-            .map_err(|e| anyhow::anyhow!("could not award grin to wallet: {}", e))?;
-        }
+        // The reward is spendable after 4 blocks have been mined, so another 3 blocks
+        // need to be mined. These are mined by the node's wallet in order to not award
+        // more block rewards to the Grin wallet passed in
+        award_blocks_to_wallet(
+            self.wallet.chain.as_ref(),
+            self.wallet.inner.clone(),
+            self.wallet.mask.as_ref(),
+            3,
+            false,
+        )
+        .map_err(|e| anyhow::anyhow!("could not mine 3 blocks: {}", e))?;
 
         Ok(())
     }
@@ -232,6 +236,7 @@ impl Wallet {
         .map_err(|e| anyhow::anyhow!("could not finalize invoice: {}", e))
     }
 
+    /// Returns the amount of Grin currently spendable by this wallet.
     pub fn get_balance(&self) -> anyhow::Result<u64> {
         wallet_info(self.inner.clone(), self.mask.as_ref())
             .map(|info| info.amount_currently_spendable)

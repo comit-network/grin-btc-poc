@@ -16,13 +16,17 @@ pub struct BobFunder0 {
 }
 
 impl BobFunder0 {
+    /// Run key generation for the redeemer of grin. Specifically for Bob, the
+    /// first round of the multi-party bulletproof protocol is executed.
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
         special_output_keypairs_funder: SpecialOutputKeyPairsFunder,
         bulletproof_round_1_other: bulletproof::Round1,
     ) -> anyhow::Result<Self> {
+        // Run key generation for the funder of grin
         let common = Funder0::new(offer, special_outputs, special_output_keypairs_funder);
+        // Run round 1 of the bulletproof protocol for Bob
         let bulletproof_round_1_self = bulletproof::Round1::new(&common.SKs_self.x.secret_key)?;
 
         Ok(Self {
@@ -32,6 +36,10 @@ impl BobFunder0 {
         })
     }
 
+    /// Run signing algorithm for funder of grin. Specifically for Bob, a
+    /// recovery key is derived from Grin's encrypted signature so that the
+    /// encryption key can later be recovered from the signature on the
+    /// transaction that Alice will publish to redeem grin
     pub fn transition(
         self,
         PKs_other: PKs,
@@ -50,9 +58,12 @@ impl BobFunder0 {
             bulletproof_round_1_other: self.bulletproof_round_1_other,
         };
 
+        // Run signing algorithm for Bob as funder of grin
         let (state, redeem_encsig) =
             state.transition(redeemer_sigs, &Y, bulletproof_round_2_other)?;
 
+        // Will need this later to recover the encryption key when Alice redeems grin,
+        // so that he can decrypt his Bitcoin signature
         let recovery_key = RecoveryKey::try_from(redeem_encsig)?;
 
         Ok((

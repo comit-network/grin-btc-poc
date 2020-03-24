@@ -14,6 +14,8 @@ pub struct RedeemerSigs {
     pub s_hat_redeem: schnorr::PartialEncryptedSignature,
 }
 
+/// Run the signing algorithm for the redeemer of grin. Also, continue on with
+/// the 2nd round of the multi-party bulletproof protocol for the redeemer.
 #[allow(clippy::too_many_arguments)]
 pub fn redeemer(
     offer: &Offer,
@@ -26,6 +28,8 @@ pub fn redeemer(
     bulletproof_round_1_redeemer: &bulletproof::Round1,
     bulletproof_round_1_funder: &bulletproof::Round1,
 ) -> anyhow::Result<(RedeemerSigs, bulletproof::Round2)> {
+    // Generate fund half-signature for the redeemer of grin (and redeemer's 2nd
+    // round of multi-party bulletproof protocol)
     let (s_fund, bulletproof_round_2_redeemer) = {
         let offset = compute_offset(&funder_PKs.R_fund, &redeemer_SKs.r_fund.public_key)?;
 
@@ -35,6 +39,13 @@ pub fn redeemer(
             Some(&offset),
         )?);
 
+        // s_fund^redeemer := r_fund^redeemer + H(R_fund || X_fund || message) *
+        // (x_fund^redeemer - offset_fund)
+        //
+        // where
+        // R_fund := R_fund^funder + R_fund^redeemer
+        // X_fund := (X_fund^funder - special_fund_input_pk) + (X_fund^redeemer)
+        // message := fee
         let s_fund = {
             let half_excess_pk_funder = compute_excess_pk(
                 vec![&special_outputs.fund_input_key],
@@ -51,6 +62,11 @@ pub fn redeemer(
             )?
         };
 
+        // Since the multi-party bulletproof is for the fund output we produce it in
+        // this block, but it is not actually used. It is only generated so that it can
+        // be passed on to the funder, which will need it during their Grin signing
+        // algorithm. Again, it may cleaner to do this before the signing phase, or at
+        // least separate this out into a separate function.
         let bulletproof_round_2_redeemer = {
             let excess_pk = PublicKey::from_combination(&*SECP, vec![
                 &redeemer_SKs.x.public_key,
@@ -71,6 +87,15 @@ pub fn redeemer(
         (s_fund, bulletproof_round_2_redeemer)
     };
 
+    // Generate refund half-signature for the redeemer of grin
+
+    // s_refund^redeemer := r_refund^redeemer + H(R_refund || X_refund || message) *
+    // (-x_fund^redeemer - offset_refund)
+    //
+    // where
+    // R_refund := R_refund^funder + R_refund^redeemer
+    // X_refund := (special_refund_output_pk - X_fund^funder) + (-X_fund^redeemer)
+    // message := fee, lock_height (expiry)
     let s_refund = {
         let offset = compute_offset(&funder_PKs.R_refund, &redeemer_SKs.r_refund.public_key)?;
 
@@ -99,6 +124,15 @@ pub fn redeemer(
         )?
     };
 
+    // Generate redeem encrypted half-signature for the redeemer of grin
+
+    // s_hat_redeem^redeemer := r_redeem^redeemer + H(R_redeem || X_redeem ||
+    // message) * (special_redeem_output_sk - x_fund^redeemer - offset_redeem)
+    //
+    // where
+    // R_redeem := R_redeem^funder + R_redeem^redeemer + Y
+    // X_redeem := (-X_fund^funder) + (special_redeem_output_pk - X_fund^redeemer)
+    // message := fee
     let s_hat_redeem = {
         let offset = compute_offset(&funder_PKs.R_redeem, &redeemer_SKs.r_redeem.public_key)?;
 
@@ -169,6 +203,7 @@ pub fn funder(
 ) -> anyhow::Result<(FunderActions, schnorr::EncryptedSignature)> {
     let X = PublicKey::from_combination(&*SECP, vec![&redeemer_PKs.X, &funder_SKs.x.public_key])?;
 
+    // Generate fund action
     let fund = {
         let offset = compute_offset(&funder_SKs.r_fund.public_key, &redeemer_PKs.R_fund)?;
 
@@ -193,6 +228,8 @@ pub fn funder(
         )
         .map_err(|_| RedeemerSignatureError::Fund)?;
 
+        // Multi-party bulletproof completed here and used to construct the fund
+        // transaction
         let bulletproof = {
             let bulletproof_round_2_funder = bulletproof::Round2::new(
                 &funder_SKs.x.secret_key,
@@ -234,6 +271,7 @@ pub fn funder(
         )?
     };
 
+    // Generate refund action
     let refund = {
         let offset = compute_offset(&funder_SKs.r_refund.public_key, &redeemer_PKs.R_refund)?;
 
@@ -261,6 +299,7 @@ pub fn funder(
         )
         .map_err(|_| RedeemerSignatureError::Refund)?;
 
+        // Single party bulletproof can be trivially generated
         let bulletproof = SECP.bullet_proof(
             offer.fund_output_amount(),
             special_output_keypairs_funder
@@ -292,6 +331,14 @@ pub fn funder(
         )?
     };
 
+    // Generate encrypted redeem signature which will be sent to the redeemer of
+    // grin.
+    //
+    // If the redeemer is Alice she will just decrypt this using the encryption key
+    // y and use it to redeem the grin once it has been funded; if the redeemer is
+    // Bob, he will have to wait for Alice to redeem the other asset (Bitcoin),
+    // recover the encryption key from said redeem transaction and use it to decrypt
+    // this signature. He will then be able to use it to redeem the grin
     let encsign_redeem = {
         let offset = compute_offset(&funder_SKs.r_redeem.public_key, &redeemer_PKs.R_redeem)?;
 

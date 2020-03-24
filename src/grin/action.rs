@@ -415,10 +415,10 @@ pub fn aggregate_with_spending_transaction(
         .find(|p| p.id == 1)
         .ok_or_else(|| anyhow::anyhow!("missing sender data"))?;
 
-    // The aggregate transaction will contain another kernel which will be height
-    // locked according to the expiry defined in the offer. Therefore, there is no
-    // need to height lock the kernel corresponding to the other transaction
-    // involved
+    // For refund: The aggregate transaction will contain another kernel which will
+    // be height locked according to the expiry defined in the offer. Therefore,
+    // there is no need to height lock the kernel corresponding to the other
+    // transaction involved
     let partial_sig = schnorr::sign_2p_0(
         &blind_excess_keypair,
         &r,

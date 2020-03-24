@@ -25,6 +25,8 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
             grin::alice::AliceFunder0::new(offer_grin, outputs_grin, output_keypairs_grin_funder)?;
         let bitcoin_state = bitcoin::alice::AliceRedeemer0::new(offer_bitcoin, outputs_bitcoin);
 
+        // Compose together the keys generated for Grin and Bitcoin with the things that
+        // only Alice has to generate i.e. the encryption key and the commitment
         Ok(Alice0::state_and_message(
             grin_state.clone(),
             bitcoin_state,
@@ -62,6 +64,9 @@ impl Alice0<grin::AliceFunder0, bitcoin::AliceRedeemer0> {
 }
 
 impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
+    /// Start the key generation for Alice when swapping bitcoin for grin. Also
+    /// prepare commitment to public keys, which will be sent to Bob, and kick
+    /// off multi-party bulletproof protocol.
     pub fn new(
         offer_bitcoin: bitcoin::Offer,
         outputs_bitcoin: bitcoin::WalletOutputs,
@@ -83,6 +88,10 @@ impl Alice0<bitcoin::AliceFunder0, grin::AliceRedeemer0> {
         ))
     }
 
+    /// Incorporate Bob public keys from `Message1` and execute Grin signing
+    /// protocol for Alice as redeemer of Grin. Also prepare opening of
+    /// prior commitment to public keys, which will be sent to Bob, and
+    /// continue with multi-party bulletproof protocol.
     #[allow(clippy::type_complexity)]
     pub fn receive(
         mut self,
@@ -123,6 +132,11 @@ where
     A: Into<CoinTossingKeys> + Clone,
     B: Into<CoinTossingKeys> + Clone,
 {
+    /// Compose the state of alpha ledger and beta ledger after key generation,
+    /// together with the encryption keypair, something which only Alice
+    /// generates; generate the commitment to Alice's public keys which will be
+    /// sent to Bob; and add the first round of the bulletproof protocol for
+    /// Alice to the message to be sent to Bob.
     pub fn state_and_message(
         alpha_state: A,
         beta_state: B,
@@ -150,6 +164,9 @@ where
         (state, message)
     }
 
+    /// Generate the opening which will reveal to Bob the keys Alice committed
+    /// to. Bob will be able to verify this by hashing the opening and comparing
+    /// it with the commitment.
     pub fn opening(&self) -> Opening {
         Opening::new(
             self.alpha_state.clone().into(),
@@ -195,6 +212,8 @@ impl Alice1<grin::AliceFunder1, bitcoin::AliceRedeemer1> {
     }
 }
 
+/// Generate redeem action by decrypting the encrypted redeem signature sent by
+/// Bob in `Message3`; execute signing protocol for Alice as funder of Bitcoin
 impl Alice1<bitcoin::AliceFunder1, grin::AliceRedeemer1> {
     pub fn receive(
         self,

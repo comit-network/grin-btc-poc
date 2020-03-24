@@ -43,6 +43,8 @@ pub struct Funder0 {
 }
 
 impl Funder0 {
+    /// Run key generation for the funder of grin, composing it with the rest of
+    /// the Grin state.
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
@@ -70,6 +72,7 @@ pub struct Funder1 {
     pub bulletproof_round_1_other: bulletproof::Round1,
 }
 
+/// Run signing algorithm for funder of grin.
 impl Funder1 {
     pub fn transition(
         self,
@@ -114,6 +117,8 @@ pub struct Redeemer0 {
 }
 
 impl Redeemer0 {
+    /// Run key generation for the redeemer of grin, composing it with the rest
+    /// of the Grin state.
     pub fn new(
         offer: Offer,
         special_outputs: SpecialOutputs,
@@ -129,6 +134,9 @@ impl Redeemer0 {
         }
     }
 
+    /// Run the signing algorithm for the redeemer of grin, using the public
+    /// keys sent over by the funder. Also, continue on with the 2nd round of
+    /// the multi-party bulletproof protocol for the redeemer.
     pub fn transition(
         self,
         bulletproof_common_nonce: bulletproof::CommonNonce,
@@ -298,6 +306,9 @@ pub fn compute_offset(funder_R: &PublicKey, redeemer_R: &PublicKey) -> anyhow::R
     Ok(SecretKey::from_slice(&*SECP, &hasher.result())?)
 }
 
+/// Check if redeem public nonces and encryption public key combine by add up to
+/// produce an R which is a quadratic residue. Leave keys unchanged if they do,
+/// but mutate them by negating them if they don't.
 pub fn normalize_redeem_keys_alice(
     r0: &mut KeyPair,
     R1: &mut PublicKey,

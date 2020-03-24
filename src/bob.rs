@@ -83,6 +83,8 @@ impl Bob0<grin::BobRedeemer0, bitcoin::BobFunder0> {
 }
 
 impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
+    /// Start the key generation for Bob when swapping grin for bitcoin, using
+    /// `Message0`, sent by Alice.
     pub fn new(
         offer_bitcoin: bitcoin::Offer,
         outputs_bitcoin: bitcoin::WalletOutputs,
@@ -113,6 +115,10 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         ))
     }
 
+    /// Incorporate Alice public keys after verifying that the opening in
+    /// `Message2` matches the commitment sent in `Message0`; execute signing
+    /// protocol for Bob as redeemer of Bitcoin; and execute signing protocol
+    /// for Bob as funder of Grin
     pub fn receive(
         self,
         Message2 {
@@ -123,6 +129,8 @@ impl Bob0<bitcoin::BobRedeemer0, grin::BobFunder0> {
         Bob1<bitcoin::BobRedeemer1, grin::BobFunder1>,
         Message3<bitcoin::Signature, grin::EncryptedSignature>,
     )> {
+        // If the opening verifies against the commitment, we continue. Otherwise, abort
+        // the protocol.
         let (alice_PKs_bitcoin, alice_PKs_grin, Y) = opening.open(self.alice_commitment)?;
 
         let (bitcoin_state, bitcoin_redeemer_refund_sig) =

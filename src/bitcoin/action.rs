@@ -123,7 +123,7 @@ impl Execute for Fund {
     type Wallet = FunderWallet;
     type Return = ();
     fn execute(self, wallet: &Self::Wallet) -> anyhow::Result<Self::Return> {
-        let transaction = wallet.sign_input(self.transaction)?;
+        let transaction = wallet.sign_fund_input(self.transaction)?;
 
         wallet.send_rawtransaction(&transaction).context("fund")
     }

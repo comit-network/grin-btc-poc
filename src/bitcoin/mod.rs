@@ -42,6 +42,7 @@ pub struct Funder0 {
 }
 
 impl Funder0 {
+    /// Run key generation for the funder of bitcoin.
     pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
         let SKs_self = keygen();
 
@@ -52,6 +53,7 @@ impl Funder0 {
         }
     }
 
+    /// Add redeemer Bitcoin public keys to Funder's state
     pub fn transition(self, PKs_other: PKs) -> Funder1 {
         Funder1 {
             offer: self.offer,
@@ -102,6 +104,7 @@ pub struct Redeemer0 {
 }
 
 impl Redeemer0 {
+    /// Run key generation for the redeemer of bitcoin.
     pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
         let SKs_self = keygen();
 

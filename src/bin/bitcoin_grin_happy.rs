@@ -42,6 +42,9 @@ fn main() -> anyhow::Result<()> {
         fee: 5_000_000,
         expiry: 0,
     };
+
+    // Special output generation is assumed to occur before key generation and
+    // signing, but it could just as easily be included in key generation
     let output_keypairs_grin_funder = grin::SpecialOutputKeyPairsFunder::new_random();
     let output_keypairs_grin_redeemer = grin::SpecialOutputKeyPairsRedeemer::new_random();
     let outputs_grin = grin::SpecialOutputs {
@@ -50,8 +53,18 @@ fn main() -> anyhow::Result<()> {
         refund_output_key: output_keypairs_grin_funder.refund_output_key.public_key,
     };
 
-    // Key generation and signing
-
+    // Key generation and signing. These were originally specified as separate
+    // protocols, but they have been implemented next to each other to reduce the
+    // number of messages.
+    //
+    // In terms of COMIT, the messages exchanged during this phase would belong in
+    // the communication layer. Instead of defining multiple small, composable
+    // libp2p protocols like we are doing for HAN/HErc20, I would expect this to be
+    // a single protocol with multiple rounds.
+    //
+    // The states and messages are expressed generically to allow us to implement
+    // the protocol in the other direction (alice owning grin and Bob bitcoin)
+    // without excessive duplication.
     let (alice0, message0) = Alice0::<bitcoin::AliceFunder0, grin::AliceRedeemer0>::new(
         offer_bitcoin.clone(),
         outputs_bitcoin.clone(),

@@ -59,6 +59,7 @@ pub fn funder(
         &funder_SKs.x.public_key,
     )?;
 
+    // Input to be signed by wallet before broadcast
     let fund = action::Fund {
         transaction: fund_transaction.clone(),
     };

@@ -17,6 +17,11 @@ pub struct Node {
 }
 
 impl Node {
+    /// Start bitcoind and initialise two wallets: one for the funder and one
+    /// for the redeemer. Also, mint 3 bitcoin for the funder.
+    ///
+    /// Expects bitcoind 0.17.0 to be in the path. The version is important
+    /// because some calls are deprecated in later versions.
     pub fn start() -> anyhow::Result<(Node, Wallets)> {
         let process = Command::new("bitcoind")
             .args(&[
@@ -36,6 +41,7 @@ impl Node {
             url: url.into(),
         };
 
+        // only coins after the first 100 blocks are spendable
         node.generate_blocks(100)?;
 
         let fund_input = node.mint(3)?;

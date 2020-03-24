@@ -74,7 +74,9 @@ pub struct BobFunder2 {
 pub struct BobRedeemer0(pub Redeemer0);
 
 impl BobRedeemer0 {
+    /// Run key generation for the redeemer of bitcoin.
     pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
+        // Just run key generation for the funder of bitcoin. Nothing else.
         Self(Redeemer0::new(offer, wallet_outputs))
     }
 

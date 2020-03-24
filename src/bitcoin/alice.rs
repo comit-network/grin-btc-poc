@@ -12,10 +12,13 @@ use std::convert::TryInto;
 pub struct AliceFunder0(pub Funder0);
 
 impl AliceFunder0 {
+    /// Run key generation for the funder of bitcoin.
     pub fn new(offer: Offer, wallet_outputs: WalletOutputs) -> Self {
+        // Just run key generation for the funder of bitcoin. Nothing else.
         Self(Funder0::new(offer, wallet_outputs))
     }
 
+    /// Incorporate Bob's Bitcoin public keys into Alice's state
     pub fn transition(self, PKs_other: PKs) -> AliceFunder1 {
         AliceFunder1(self.0.transition(PKs_other))
     }
