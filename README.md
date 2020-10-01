@@ -1,1 +1,1 @@
-Work-in-progress implementation of a Grin-Bitcoin atomic swap using one-time verifiably encrypted signatures. For more information, check out the [protocol specification](https://github.com/comit-network/grin-btc-poc/blob/master/spec.pdf).
+Implementation of a Grin-Bitcoin atomic swap using one-time verifiably encrypted signatures. For more information, check out the [protocol specification](https://github.com/comit-network/grin-btc-poc/blob/master/spec.pdf).
